@@ -10,7 +10,7 @@ public class GradientProgressBarUI extends BasicProgressBarUI {
         }
 
         Graphics2D g2d = (Graphics2D) g;
-        Insets b = progressBar.getInsets(); // area for border
+        Insets b = progressBar.getInsets();
         int barRectWidth = progressBar.getWidth() - b.right - b.left;
         int barRectHeight = progressBar.getHeight() - b.top - b.bottom;
         if (barRectWidth <= 0 || barRectHeight <= 0) {
@@ -24,7 +24,6 @@ public class GradientProgressBarUI extends BasicProgressBarUI {
             g2d.fillRect(b.left, b.top, amountFull, barRectHeight);
         }
 
-        // Deal with possible text painting
         if (progressBar.isStringPainted()) {
             paintString(g, b.left, b.top, barRectWidth, barRectHeight, amountFull, b);
         }

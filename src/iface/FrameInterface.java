@@ -14,13 +14,12 @@ public class FrameInterface {
 
     private static final String[] IMAGE_PATHS = {
             "mandelbrot1.png", "mandelbrot2.png", "mandelbrot3.png",
-            "mandelbrot4.png", "mandelbrot5.png", "mandelbrot6.png", "mandelbrot7.png"
+            "mandelbrot4.png", "mandelbrot5.png", "mandelbrot6.png"
     };
-
     private static final int NORTH_COL = 0x011324;
     private static final int SOUTH_COL = 0x011a30;
     private static final Font buttonFont = new Font("Arial", Font.BOLD, 16);
-    private static final String RESOURCES_PATH = "C:/Users/8220920/IdeaProjects/MandelbrotIFace/resources/";
+    private static final String RESOURCES_PATH = "C:/Users/Илья/IdeaProjects/IFaceMandelbrot/resources/";
     private static final Dimension buttonSize = new Dimension(400, 40);
     private static final Dimension fieldSize = new Dimension(400, 30);
 
@@ -37,7 +36,7 @@ public class FrameInterface {
     }
 
     private static void createMainFrame() {
-        JFrame mainFrame = new JFrame("Шифратор Мандельброта");
+        JFrame mainFrame = new JFrame("Шифр Мандельброта");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainFrame.setSize(screenWidth, screenHeight);
         mainFrame.setLocationRelativeTo(null);
@@ -46,6 +45,7 @@ public class FrameInterface {
         mainPanel = new JPanel(cardLayout);
         mainFrame.add(mainPanel);
         mainFrame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+
         createLoadingScreen(mainFrame);
     }
 
@@ -55,7 +55,7 @@ public class FrameInterface {
 
         GridBagConstraints gbc = new GridBagConstraints();
         setGridConstraints(gbc, 0, 0, -1, -1, GridBagConstraints.HORIZONTAL);
-        gbc.insets = new Insets(0, 0, 20, 0); // Отступ снизу для надписи
+        gbc.insets = new Insets(0, 0, 64, 0);
 
         JLabel loadingLabel = initializeNewLabel("Mandelbrott", 96, 0);
         loadingLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -111,27 +111,24 @@ public class FrameInterface {
         startPanel.setLayout(new GridBagLayout());
 
         JButton encryptButton = initializeNewButton("Зашифровать изображение", buttonSize, buttonFont,
-                e -> {createEncrypt1Panel();
-                    cardLayout.show(mainPanel, "Encrypt1Panel"); });
+                e -> {createEncryptBeginPanel();
+                    cardLayout.show(mainPanel, "EncryptBeginPanel"); });
         JButton decryptButton = initializeNewButton("Расшифровать изображение", buttonSize, buttonFont,
-                e -> {createDecrypt1Panel();
-                    cardLayout.show(mainPanel, "Decrypt1Panel"); });
+                e -> {createDecryptBeginPanel();
+                    cardLayout.show(mainPanel, "DecryptBeginPanel"); });
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        setGridConstraints(constraints, 0, 0, -1, -1, -1);
-        startPanel.add(encryptButton, constraints);
+        addComponent(startPanel, encryptButton, constraints, 0, 0, 1, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL);
+        addComponent(startPanel, decryptButton, constraints, 0, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL);
 
-        setGridConstraints(constraints, -1, 1, -1, -1, -1);
-        startPanel.add(decryptButton, constraints);
-
-        mainPanel.add(startPanel, "StartPanel");
+        mainPanel.add(startPanel,"StartPanel");
     }
 
-    private static void createEncrypt1Panel() {
-        JPanel encrypt1Panel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
-        encrypt1Panel.setLayout(new GridBagLayout());
+    private static void createEncryptBeginPanel() {
+        JPanel encryptBeginPanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        encryptBeginPanel.setLayout(new GridBagLayout());
         JLabel fileLabel = initializeNewLabel("Выберите изображение для шифрования:", 32, 0);
 
         JButton uploadButton = initializeNewButton("Загрузить изображение", buttonSize, buttonFont,
@@ -143,16 +140,10 @@ public class FrameInterface {
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        setGridConstraints(constraints, 0, 0, -1, GridBagConstraints.CENTER, -1);
-        encrypt1Panel.add(fileLabel, constraints);
-
-        setGridConstraints(constraints, -1, 1, -1, -1, -1);
-        encrypt1Panel.add(uploadButton, constraints);
-
-        setGridConstraints(constraints, -1, 2, -1, -1, -1);
-        encrypt1Panel.add(backButton, constraints);
-
-        mainPanel.add(encrypt1Panel, "Encrypt1Panel");
+        addComponent(encryptBeginPanel, fileLabel, constraints, 0, 0, -1, GridBagConstraints.CENTER, -1);
+        addComponent(encryptBeginPanel, uploadButton, constraints, -1, 1, -1, -1, -1);
+        addComponent(encryptBeginPanel, backButton, constraints, -1, 2, -1, -1, -1);
+        mainPanel.add(encryptBeginPanel, "EncryptBeginPanel");
     }
 
     private static void createEncryptLoadPanel() {
@@ -164,71 +155,55 @@ public class FrameInterface {
         JPanel imageContainer = initializeImageContainer(imageIcon);
 
         JButton regenerateButton = initializeNewButton("Продолжить шифрование", buttonSize, buttonFont,
-                e -> {createEncrypt2Panel();
-                    cardLayout.show(mainPanel, "Encrypt2Panel");});
+                e -> {createEncryptModePanel();
+                    cardLayout.show(mainPanel, "EncryptModePanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Encrypt1Panel");});
+                e -> {cardLayout.show(mainPanel, "EncryptBeginPanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        setGridConstraints(constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
-        encryptLoadPanel.add(imageLabel, constraints);
-
-        setGridConstraints(constraints, 1, 1, 1, -1, GridBagConstraints.BOTH);
-        encryptLoadPanel.add(imageContainer, constraints);
-
+        addComponent(encryptLoadPanel, imageLabel, constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
+        addComponent(encryptLoadPanel, imageContainer, constraints, 1, 1, 1, -1, GridBagConstraints.BOTH);
         setGridConstraints(constraints, 0, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.NONE);
 
         JPanel buttonPanel = new TransparentPanel(new GridBagLayout());
         GridBagConstraints buttonConstraints = new GridBagConstraints();
         buttonConstraints.insets = new Insets(5, 5, 5, 5);
 
-        setGridConstraints(buttonConstraints, 0, 0, -1, -1, -1);
-        buttonPanel.add(regenerateButton, buttonConstraints);
-
-        setGridConstraints(buttonConstraints, -1, 1, -1, -1, -1);
-        buttonPanel.add(backButton, buttonConstraints);
-
+        addComponent(buttonPanel, regenerateButton, buttonConstraints, 0, 0, -1, -1, -1);
+        addComponent(buttonPanel, backButton, buttonConstraints, -1, 1, -1, -1, -1);
         encryptLoadPanel.add(buttonPanel, constraints);
         mainPanel.add(encryptLoadPanel, "EncryptLoadPanel");
     }
 
-    private static void createEncrypt2Panel() {
-        JPanel encrypt2Panel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
-        encrypt2Panel.setLayout(new GridBagLayout());
+    private static void createEncryptModePanel() {
+        JPanel encryptModePanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        encryptModePanel.setLayout(new GridBagLayout());
 
         JLabel fileLabel2 = initializeNewLabel("Выберите изображение-ключ:", 32, 0);
         JButton generateButton = initializeNewButton("Сгенерировать изображение-ключ", buttonSize, buttonFont,
-                e -> {createEncrypt3Panel();
-                    cardLayout.show(mainPanel, "Encrypt3Panel");});
+                e -> {createEncryptGeneratePanel();
+                    cardLayout.show(mainPanel, "EncryptGeneratePanel");});
         JButton manualButton = initializeNewButton("Ввести параметры ключа вручную", buttonSize, buttonFont,
                 e -> {createManualEncryptionPanel();
                     cardLayout.show(mainPanel, "ManualEncryptionPanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Encrypt1Panel");});
+                e -> {cardLayout.show(mainPanel, "EncryptBeginPanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        setGridConstraints(constraints, 0, 0, -1, GridBagConstraints.CENTER, -1);
-        encrypt2Panel.add(fileLabel2, constraints);
-
-        setGridConstraints(constraints, -1, 1, -1, -1, -1);
-        encrypt2Panel.add(generateButton, constraints);
-
-        setGridConstraints(constraints, -1, 2, -1, -1, -1);
-        encrypt2Panel.add(manualButton, constraints);
-
-        setGridConstraints(constraints, -1, 3, -1, -1, -1);
-        encrypt2Panel.add(backButton, constraints);
-
-        mainPanel.add(encrypt2Panel, "Encrypt2Panel");
+        addComponent(encryptModePanel, fileLabel2, constraints, 0, 0, -1, GridBagConstraints.CENTER, -1);
+        addComponent(encryptModePanel, generateButton, constraints, 0, 1, -1, -1, -1);
+        addComponent(encryptModePanel, manualButton, constraints, 0, 2, -1, -1, -1);
+        addComponent(encryptModePanel, backButton, constraints, 0, 3, -1, -1, -1);
+        mainPanel.add(encryptModePanel, "EncryptModePanel");
     }
 
-    private static void createEncrypt3Panel() {
-        JPanel encrypt3Panel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
-        encrypt3Panel.setLayout(new GridBagLayout());
+    private static void createEncryptGeneratePanel() {
+        JPanel encryptGeneratePanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        encryptGeneratePanel.setLayout(new GridBagLayout());
         JLabel imageLabel = initializeNewLabel("Ваше изображение-ключ:", 32, 0);
 
         String imagePath = getRandomImagePath();
@@ -252,38 +227,65 @@ public class FrameInterface {
         JButton okayButton = initializeNewButton("Зашифровать изображение", buttonSize, buttonFont,
                 e -> {createEncryptFinalPanel();
                     cardLayout.show(mainPanel, "EncryptFinalPanel");});
+        JButton partButton = initializeNewButton("Зашифровать часть изображения", buttonSize, buttonFont,
+                e -> {createEncryptPartialPanel();
+                    cardLayout.show(mainPanel, "EncryptPartialPanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Encrypt2Panel");});
+                e -> {cardLayout.show(mainPanel, "EncryptModePanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        setGridConstraints(constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
-        encrypt3Panel.add(imageLabel, constraints);
-
-        setGridConstraints(constraints, 1, 1, 1, -1, GridBagConstraints.BOTH);
-        encrypt3Panel.add(imageContainer, constraints);
-
+        addComponent(encryptGeneratePanel, imageLabel, constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
+        addComponent(encryptGeneratePanel, imageContainer, constraints, 1, 1, 1, -1, GridBagConstraints.BOTH);
         setGridConstraints(constraints, 0, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.NONE);
 
         JPanel buttonPanel = new TransparentPanel(new GridBagLayout());
         GridBagConstraints buttonConstraints = new GridBagConstraints();
         buttonConstraints.insets = new Insets(5, 5, 5, 5);
 
-        setGridConstraints(buttonConstraints, 0, 0, -1, -1, -1);
-        buttonPanel.add(regenerateButton, buttonConstraints);
+        addComponent(buttonPanel, regenerateButton, buttonConstraints, 0, 0, -1, -1, -1);
+        addComponent(buttonPanel, manualButton, buttonConstraints, -1, 1, -1, -1, -1);
+        addComponent(buttonPanel, okayButton, buttonConstraints, -1, 2, -1, -1, -1);
+        addComponent(buttonPanel, partButton, buttonConstraints, -1, 3, -1, -1, -1);
+        addComponent(buttonPanel, backButton, buttonConstraints, -1, 4, -1, -1, -1);
+        encryptGeneratePanel.add(buttonPanel, constraints);
+        mainPanel.add(encryptGeneratePanel, "EncryptGeneratePanel");
+    }
 
-        setGridConstraints(buttonConstraints, -1, 1, -1, -1, -1);
-        buttonPanel.add(manualButton, buttonConstraints);
+    private static void createEncryptPartialPanel() {
+        JPanel encryptPartialPanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        encryptPartialPanel.setLayout(new GridBagLayout());
+        JLabel imageLabel = initializeNewLabel("Выберите область изображения для шифрования:", 32, 0);
 
-        setGridConstraints(buttonConstraints, -1, 2, -1, -1, -1);
-        buttonPanel.add(okayButton, buttonConstraints);
+        ImageIcon imageIcon = loadImageIcon(RESOURCES_PATH + "input.jpg");
+        ImageContainerWithDrawing imageContainer = new ImageContainerWithDrawing(imageIcon);
+        imageContainer.setPreferredSize(new Dimension(1024, 768));
 
-        setGridConstraints(buttonConstraints, -1, 3, -1, -1, -1);
-        buttonPanel.add(backButton, buttonConstraints);
+        JButton regenerateButton = initializeNewButton("Продолжить шифрование", buttonSize, buttonFont,
+                e -> {createEncryptFinalPanel();
+                    cardLayout.show(mainPanel, "EncryptFinalPanel");});
+        JButton againButton = initializeNewButton("Выбрать другую область", buttonSize, buttonFont,
+                e -> {});
+        JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
+                e -> {cardLayout.show(mainPanel, "EncryptGeneratePanel");});
 
-        encrypt3Panel.add(buttonPanel, constraints);
-        mainPanel.add(encrypt3Panel, "Encrypt3Panel");
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.insets = new Insets(10, 10, 10, 10);
+
+        addComponent(encryptPartialPanel, imageLabel, constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
+        addComponent(encryptPartialPanel, imageContainer, constraints, 1, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.BOTH);
+        setGridConstraints(constraints, 0, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.NONE);
+
+        JPanel buttonPanel = new TransparentPanel(new GridBagLayout());
+        GridBagConstraints buttonConstraints = new GridBagConstraints();
+        buttonConstraints.insets = new Insets(5, 5, 5, 5);
+
+        addComponent(buttonPanel, regenerateButton, buttonConstraints, 0, 0, -1, -1, -1);
+        addComponent(buttonPanel, againButton, buttonConstraints, -1, 1, -1, -1, -1);
+        addComponent(buttonPanel, backButton, buttonConstraints, -1, 2, -1, -1, -1);
+        encryptPartialPanel.add(buttonPanel, constraints);
+        mainPanel.add(encryptPartialPanel, "EncryptPartialPanel");
     }
 
     private static void createEncryptFinalPanel() {
@@ -295,7 +297,7 @@ public class FrameInterface {
         JPanel imageContainer = initializeImageContainer(imageIcon);
 
         JButton regenerateButton = initializeNewButton("Сгенерировать новый ключ", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Encrypt2Panel");});
+                e -> {cardLayout.show(mainPanel, "EncryptModePanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
                 e -> {cardLayout.show(mainPanel, "StartPanel");});
 
@@ -331,10 +333,10 @@ public class FrameInterface {
         JTextField yField = initializeNewTextField(20, fieldSize);
 
         JButton saveButton = initializeNewButton("Сохранить сгенерированный ключ", buttonSize, buttonFont,
-                e -> {createEncrypt3Panel();
-                    cardLayout.show(mainPanel, "Encrypt3Panel");});
+                e -> {createEncryptGeneratePanel();
+                    cardLayout.show(mainPanel, "EncryptGeneratePanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Encrypt2Panel");});
+                e -> {cardLayout.show(mainPanel, "EncryptModePanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(5, 10, 5, 10);
@@ -351,13 +353,12 @@ public class FrameInterface {
 
         addComponent(manualEncryptPanel, saveButton, constraints, 0, 5, 2, -1, -1);
         addComponent(manualEncryptPanel, backButton, constraints, -1, 6, -1, -1, -1);
-
         mainPanel.add(manualEncryptPanel, "ManualEncryptionPanel");
     }
 
-    private static void createDecrypt1Panel() {
-        JPanel decrypt1Panel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
-        decrypt1Panel.setLayout(new GridBagLayout());
+    private static void createDecryptBeginPanel() {
+        JPanel decryptBeginPanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        decryptBeginPanel.setLayout(new GridBagLayout());
 
         JLabel fileLabel = initializeNewLabel("Выберите изображение для расшифрования:", 32, 0);
         JButton uploadButton = initializeNewButton("Загрузить изображение из файла", buttonSize, buttonFont,
@@ -369,11 +370,10 @@ public class FrameInterface {
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        addComponent(decrypt1Panel, fileLabel, constraints, 0, 0, -1, -1, -1);
-        addComponent(decrypt1Panel, uploadButton, constraints, -1, 1, 1, -1, -1);
-        addComponent(decrypt1Panel, backButton, constraints, -1, 2, -1, -1, -1);
-
-        mainPanel.add(decrypt1Panel, "Decrypt1Panel");
+        addComponent(decryptBeginPanel, fileLabel, constraints, 0, 0, -1, -1, -1);
+        addComponent(decryptBeginPanel, uploadButton, constraints, -1, 1, 1, -1, -1);
+        addComponent(decryptBeginPanel, backButton, constraints, -1, 2, -1, -1, -1);
+        mainPanel.add(decryptBeginPanel, "DecryptBeginPanel");
     }
 
     private static void createDecryptLoadPanel() {
@@ -385,10 +385,10 @@ public class FrameInterface {
         JPanel imageContainer = initializeImageContainer(imageIcon);
 
         JButton regenerateButton = initializeNewButton("Продолжить расшифровку", buttonSize, buttonFont,
-                e -> {createDecrypt2Panel();
-                    cardLayout.show(mainPanel, "Decrypt2Panel");});
+                e -> {createDecryptModePanel();
+                    cardLayout.show(mainPanel, "DecryptModePanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt1Panel");});
+                e -> {cardLayout.show(mainPanel, "DecryptBeginPanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
@@ -403,39 +403,37 @@ public class FrameInterface {
 
         addComponent(buttonPanel, regenerateButton, buttonConstraints, 0, 0, -1, -1, -1);
         addComponent(buttonPanel, backButton, buttonConstraints, -1, 1, -1, -1, -1);
-
         decryptLoadPanel.add(buttonPanel, constraints);
         mainPanel.add(decryptLoadPanel, "DecryptLoadPanel");
     }
 
-    private static void createDecrypt2Panel() {
-        JPanel decrypt2Panel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
-        decrypt2Panel.setLayout(new GridBagLayout());
+    private static void createDecryptModePanel() {
+        JPanel decryptModePanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        decryptModePanel.setLayout(new GridBagLayout());
         JLabel fileLabel2 = initializeNewLabel("Выберите изображение-ключ:", 32, 0);
 
         JButton uploadButton = initializeNewButton("Загрузить изображение-ключ из файла", buttonSize, buttonFont,
-                e -> {createDecrypt3Panel();
-                    cardLayout.show(mainPanel, "Decrypt3Panel");});
+                e -> {createDecryptKeyPanel();
+                    cardLayout.show(mainPanel, "DecryptKeyPanel");});
         JButton manualButton = initializeNewButton("Ввести параметры ключа вручную", buttonSize, buttonFont,
                 e -> {createManualDecryptionPanel();
                     cardLayout.show(mainPanel, "ManualDecryptionPanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt1Panel");});
+                e -> {cardLayout.show(mainPanel, "DecryptBeginPanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        addComponent(decrypt2Panel, fileLabel2, constraints, 0, 0, -1, -1, -1);
-        addComponent(decrypt2Panel, uploadButton, constraints, -1, 1, -1, -1, -1);
-        addComponent(decrypt2Panel, manualButton, constraints, -1, 2, -1, -1, -1);
-        addComponent(decrypt2Panel, backButton, constraints, -1, 3, -1, -1, -1);
-
-        mainPanel.add(decrypt2Panel, "Decrypt2Panel");
+        addComponent(decryptModePanel, fileLabel2, constraints, 0, 0, -1, -1, -1);
+        addComponent(decryptModePanel, uploadButton, constraints, -1, 1, -1, -1, -1);
+        addComponent(decryptModePanel, manualButton, constraints, -1, 2, -1, -1, -1);
+        addComponent(decryptModePanel, backButton, constraints, -1, 3, -1, -1, -1);
+        mainPanel.add(decryptModePanel, "DecryptModePanel");
     }
 
-    private static void createDecrypt3Panel() {
-        JPanel decrypt3Panel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
-        decrypt3Panel.setLayout(new GridBagLayout());
+    private static void createDecryptKeyPanel() {
+        JPanel decryptKeyPanel = new GradientPanel(new Color(NORTH_COL), new Color(SOUTH_COL));
+        decryptKeyPanel.setLayout(new GridBagLayout());
         JLabel imageLabel = initializeNewLabel("Ваше изображение-ключ:", 32, 0);
 
         String imagePath = getRandomImagePath();
@@ -443,7 +441,7 @@ public class FrameInterface {
         JPanel imageContainer = initializeImageContainer(imageIcon);
 
         JButton regenerateButton = initializeNewButton("Загрузить другой ключ", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt2Panel");});
+                e -> {cardLayout.show(mainPanel, "DecryptModePanel");});
         JButton manualButton = initializeNewButton("Ввести другие параметры ключа", buttonSize, buttonFont,
                 e -> {createManualDecryptionPanel();
                     cardLayout.show(mainPanel, "ManualDecryptionPanel");});
@@ -451,13 +449,13 @@ public class FrameInterface {
                 e -> {createDecryptFinalPanel();
                     cardLayout.show(mainPanel, "DecryptFinalPanel");});
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt2Panel");});
+                e -> {cardLayout.show(mainPanel, "DecryptModePanel");});
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(10, 10, 10, 10);
 
-        addComponent(decrypt3Panel, imageLabel, constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
-        addComponent(decrypt3Panel, imageContainer, constraints, 1, 1, 1, -1, GridBagConstraints.BOTH);
+        addComponent(decryptKeyPanel, imageLabel, constraints, 1, 0, -1, GridBagConstraints.CENTER, -1);
+        addComponent(decryptKeyPanel, imageContainer, constraints, 1, 1, 1, -1, GridBagConstraints.BOTH);
         setGridConstraints(constraints, 0, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.NONE);
 
         JPanel buttonPanel = new TransparentPanel(new GridBagLayout());
@@ -468,10 +466,8 @@ public class FrameInterface {
         addComponent(buttonPanel, manualButton, buttonConstraints, -1, 1, -1, -1, -1);
         addComponent(buttonPanel, okayButton, buttonConstraints, -1, 2, -1, -1, -1);
         addComponent(buttonPanel, backButton, buttonConstraints, -1, 3, -1, -1, -1);
-
-        decrypt3Panel.add(buttonPanel, constraints);
-
-        mainPanel.add(decrypt3Panel, "Decrypt3Panel");
+        decryptKeyPanel.add(buttonPanel, constraints);
+        mainPanel.add(decryptKeyPanel, "DecryptKeyPanel");
     }
 
     private static void createDecryptFinalPanel() {
@@ -483,9 +479,9 @@ public class FrameInterface {
         JPanel imageContainer = initializeImageContainer(imageIcon);
 
         JButton reloadButton = initializeNewButton("Загрузить другое изображение", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt1Panel");});
+                e -> {cardLayout.show(mainPanel, "DecryptBeginPanel");});
         JButton reloadKeyButton = initializeNewButton("Загрузить другой ключ", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt2Panel"); });
+                e -> {cardLayout.show(mainPanel, "DecryptModePanel"); });
         JButton saveButton = initializeNewButton("Сохранить изображение", buttonSize, buttonFont,
                 e -> {createEncryptFinalPanel();
                     cardLayout.show(mainPanel, "StartPanel");});
@@ -507,7 +503,6 @@ public class FrameInterface {
         addComponent(buttonPanel, reloadKeyButton, buttonConstraints, -1, 1, -1, -1, -1);
         addComponent(buttonPanel, saveButton, buttonConstraints, -1, 2, -1, -1, -1);
         addComponent(buttonPanel, backButton, buttonConstraints, -1, 3, -1, -1, -1);
-
         decryptFinalPanel.add(buttonPanel, constraints);
         mainPanel.add(decryptFinalPanel, "DecryptFinalPanel");
     }
@@ -528,10 +523,10 @@ public class FrameInterface {
         JLabel yLabel = initializeNewLabel("Смещение по оси Y:", 20, 1);
         JTextField yField = initializeNewTextField(20, fieldSize);
         JButton saveButton = initializeNewButton("Сохранить сгенерированный ключ", buttonSize, buttonFont,
-                e -> {createDecrypt3Panel();
-                    cardLayout.show(mainPanel, "Decrypt3Panel"); });
+                e -> {createDecryptKeyPanel();
+                    cardLayout.show(mainPanel, "DecryptKeyPanel"); });
         JButton backButton = initializeNewButton("Вернуться назад", buttonSize, buttonFont,
-                e -> {cardLayout.show(mainPanel, "Decrypt2Panel"); });
+                e -> {cardLayout.show(mainPanel, "DecryptModePanel"); });
 
         addComponent(manualDecryptPanel, label, constraints, 0, 0, 2, -1, -1);
 
@@ -546,7 +541,6 @@ public class FrameInterface {
 
         addComponent(manualDecryptPanel, saveButton, constraints, 0, 5, 2, -1, -1);
         addComponent(manualDecryptPanel, backButton, constraints, -1, 6, -1, -1, -1);
-
         mainPanel.add(manualDecryptPanel, "ManualDecryptionPanel");
     }
 
@@ -586,7 +580,7 @@ public class FrameInterface {
     private static String getRandomImagePath() {
         Random random = new Random();
         String imageName = IMAGE_PATHS[random.nextInt(IMAGE_PATHS.length)];
-        return RESOURCES_PATH + imageName; // Абсолютный путь к ресурсам
+        return RESOURCES_PATH + imageName;
     }
 
     private static ImageIcon loadImageIcon(String path) {
