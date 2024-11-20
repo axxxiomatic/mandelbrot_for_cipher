@@ -2,89 +2,85 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Класс ImageContainerWithDrawing представляет собой контейнер для изображения с возможностью рисования прямоугольников на изображении.
+ * Контейнер использует JLayeredPane для отображения изображения и рисования прямоугольников поверх него.
+ *
+ * @author Илья
+ * @version 0.1
+ */
 public class ImageContainerWithDrawing extends JLayeredPane {
-    private List<Point> points = new ArrayList<>();
+    private Point startPoint;
+    private Point endPoint;
     private boolean drawingRectangle = false;
     private JPanel drawingPanel;
+    private List<Rectangle2D> rectangles = new ArrayList<>();
 
+    /**
+     * Конструктор класса ImageContainerWithDrawing.
+     *
+     * @param myIcon Изображение, которое будет отображаться в контейнере. Если изображение равно null, будет отображено сообщение "Изображение не найдено".
+     */
     public ImageContainerWithDrawing(ImageIcon myIcon) {
         setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.WHITE, 2),
                 BorderFactory.createEmptyBorder(2, 2, 2, 2)
         ));
 
-        // Создаем панель для отображения изображения
         JPanel imagePanel = new JPanel(new BorderLayout());
-        if (myIcon != null) {
-            JLabel image = new JLabel(myIcon);
-            image.setPreferredSize(new Dimension(1024, 720));
-            imagePanel.add(image, BorderLayout.CENTER);
-        } else {
-            JLabel noImageLabel = new JLabel("Изображение не найдено");
-            noImageLabel.setFont(new Font("Serif", Font.BOLD, 24));
-            noImageLabel.setPreferredSize(new Dimension(1024, 720));
-            noImageLabel.setForeground(Color.WHITE);
-            noImageLabel.setHorizontalAlignment(JLabel.CENTER);
-            noImageLabel.setVerticalAlignment(JLabel.CENTER);
-            imagePanel.add(noImageLabel, BorderLayout.CENTER);
-            imagePanel.setBackground(Color.BLACK);
+        try {
+            if (myIcon != null) {
+                JLabel image = new JLabel(myIcon);
+                image.setPreferredSize(new Dimension(1024, 720));
+                imagePanel.add(image, BorderLayout.CENTER);
+            } else {
+                JLabel noImageLabel = new JLabel("Изображение не найдено");
+                noImageLabel.setFont(new Font("Serif", Font.BOLD, 24));
+                noImageLabel.setPreferredSize(new Dimension(1024, 720));
+                noImageLabel.setForeground(Color.WHITE);
+                noImageLabel.setHorizontalAlignment(JLabel.CENTER);
+                noImageLabel.setVerticalAlignment(JLabel.CENTER);
+                imagePanel.add(noImageLabel, BorderLayout.CENTER);
+                imagePanel.setBackground(Color.BLACK);
+            }
+            imagePanel.setBounds(0, 0, 1024, 768);
+            add(imagePanel, JLayeredPane.DEFAULT_LAYER);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Ошибка при создании панели с изображением: " + ex.getMessage());
         }
-        imagePanel.setBounds(0, 0, 1024, 768);
-        add(imagePanel, JLayeredPane.DEFAULT_LAYER);
 
-        // Создаем панель для рисования
         drawingPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2d = (Graphics2D) g;
+                try {
+                    super.paintComponent(g);
+                    Graphics2D g2d = (Graphics2D) g;
 
-                if (points.size() == 2) {
-                    Point p1 = points.get(0);
-                    Point p2 = points.get(1);
-                    int x = Math.min(p1.x, p2.x);
-                    int y = Math.min(p1.y, p2.y);
-                    int width = Math.abs(p1.x - p2.x);
-                    int height = Math.abs(p1.y - p2.y);
-                    g2d.setColor(new Color(0xeb3471));
-                    g2d.drawRect(x, y, width, height);
+                    for (Rectangle2D rect : rectangles) {
+                        g2d.setColor(new Color(0xeb3471));
+                        g2d.draw(rect);
 
-                    // Рисуем отрезок между точками
-                    g2d.setColor(new Color(0xeb3471));
-                    g2d.drawLine(p1.x, p1.y, p2.x, p2.y);
+                        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
+                        g2d.fill(rect);
+                        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+                    }
 
-                    // Вычисляем длину отрезка
-                    int distance = (int) Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-
-                    // Определяем позицию для текста
-                    int textX = (p1.x + p2.x) / 2;
-                    int textY = (p1.y + p2.y) / 2;
-
-                    // Рисуем текст с белым цветом и черным контуром
-                    g2d.setFont(new Font("Arial", Font.BOLD, 20));
-
-                    g2d.setColor(Color.BLACK);
-                    g2d.drawString("Диагональ: " + distance + " пикселей", textX - 2 - distance / 4, textY - 2 + 10);
-                    g2d.drawString("Диагональ: " + distance + " пикселей", textX + 2 - distance / 4, textY + 2 + 10);
-                    g2d.drawString("Диагональ: " + distance + " пикселей", textX - 2 - distance / 4, textY + 2 + 10);
-                    g2d.drawString("Диагональ: " + distance + " пикселей", textX + 2 - distance / 4, textY - 2 + 10);
-
-                    g2d.setColor(Color.WHITE);
-                    g2d.drawString("Диагональ: " + distance + " пикселей", textX - distance / 4, textY + 10);
-                }
-
-                g2d.setColor(Color.RED);
-                for (Point point : points) {
-                    // Рисуем белый контур толщиной 2 пикселя
-                    g2d.setColor(Color.WHITE);
-                    g2d.fillOval(point.x - 5, point.y - 5, 10, 10);
-
-                    // Рисуем красную точку внутри белого контура
-                    g2d.setColor(Color.RED);
-                    g2d.fillOval(point.x - 4, point.y - 4, 8, 8);
+                    if (drawingRectangle && startPoint != null && endPoint != null) {
+                        int x = Math.min(startPoint.x, endPoint.x);
+                        int y = Math.min(startPoint.y, endPoint.y);
+                        int width = Math.abs(startPoint.x - endPoint.x);
+                        int height = Math.abs(startPoint.y - endPoint.y);
+                        g2d.setColor(new Color(0xeb3471));
+                        g2d.drawRect(x, y, width, height);
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "Ошибка при отрисовке панели: " + ex.getMessage());
                 }
             }
         };
@@ -92,33 +88,86 @@ public class ImageContainerWithDrawing extends JLayeredPane {
         drawingPanel.setBounds(0, 0, imagePanel.getWidth(), imagePanel.getHeight());
         add(drawingPanel, JLayeredPane.PALETTE_LAYER);
 
-        // Добавляем слушатели событий мыши
         drawingPanel.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (SwingUtilities.isLeftMouseButton(e)) {
-                    if (points.size() < 2) {
-                        points.add(e.getPoint());
-                        repaint();
-                    }
-                    if (points.size() == 2) {
+                try {
+                    if (SwingUtilities.isLeftMouseButton(e)) {
+                        startPoint = e.getPoint();
+                        endPoint = e.getPoint();
                         drawingRectangle = true;
                         repaint();
+                    } else if (SwingUtilities.isRightMouseButton(e)) {
+                        rectangles.clear();
+                        repaint();
                     }
-                } else if (SwingUtilities.isRightMouseButton(e)) {
-                    points.clear();
-                    drawingRectangle = false;
-                    repaint();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "Ошибка при обработке нажатия мыши: " + ex.getMessage());
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                try {
+                    if (SwingUtilities.isLeftMouseButton(e)) {
+                        endPoint = e.getPoint();
+                        drawingRectangle = false;
+                        if (startPoint != null && endPoint != null && !startPoint.equals(endPoint)) {
+                            int x = Math.min(startPoint.x, endPoint.x);
+                            int y = Math.min(startPoint.y, endPoint.y);
+                            int width = Math.abs(startPoint.x - endPoint.x);
+                            int height = Math.abs(startPoint.y - endPoint.y);
+                            rectangles.add(new Rectangle2D.Double(x, y, width, height));
+                        }
+                        repaint();
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "Ошибка при обработке отпускания мыши: " + ex.getMessage());
+                }
+            }
+        });
+
+        drawingPanel.addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                try {
+                    if (SwingUtilities.isLeftMouseButton(e)) {
+                        endPoint = e.getPoint();
+                        repaint();
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "Ошибка при обработке движения мыши: " + ex.getMessage());
                 }
             }
         });
     }
 
+    /**
+     * Переопределенный метод для размещения компонентов.
+     * Устанавливает границы всех компонентов равными границам контейнера.
+     */
     @Override
     public void doLayout() {
-        super.doLayout();
-        for (Component comp : getComponents()) {
-            comp.setBounds(0, 0, getWidth(), getHeight());
+        try {
+            super.doLayout();
+            for (Component comp : getComponents()) {
+                comp.setBounds(0, 0, getWidth(), getHeight());
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Ошибка при размещении компонентов: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Проверяет, есть ли на панели хотя бы один прямоугольник.
+     *
+     * @return true, если на панели есть хотя бы один прямоугольник, иначе false.
+     */
+    public boolean hasRectangle() {
+        return !rectangles.isEmpty();
     }
 }
