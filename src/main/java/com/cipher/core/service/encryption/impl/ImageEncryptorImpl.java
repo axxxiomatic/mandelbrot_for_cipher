@@ -4,13 +4,19 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.cipher.core.dto.*;
 import com.cipher.core.dto.encryption.EncryptedData;
+import com.cipher.core.generator.FractalGenerator;
 import com.cipher.core.service.encryption.*;
 import com.cipher.core.service.encryption.util.HKDF;
-import com.cipher.core.service.encryption.util.XOR;
 import com.cipher.core.utils.*;
+import com.cipher.core.service.encryption.util.XOROperation;
 import javafx.geometry.Rectangle2D;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,12 +30,15 @@ public class ImageEncryptorImpl implements ImageEncryptor {
     private final MandelbrotService mandelbrotService;
     private final SegmentShuffler segmentShuffler;
     private final ImageUtils imageUtils;
+    private final FractalGenerator fractalGenerator;
+    private final XOROperation xorOperation;
 
     private byte[] sessionSalt;
     private SecureRandom paramsPrng;
     private SecureRandom segmentationPrng;
-    private int attemptCount;
+    private AtomicInteger attemptCount;
     private BufferedImage fractal;
+    private int successfulAttempt;
 
     /**
      * Подготавливает сессию шифрования на основе общего секрета.
@@ -58,7 +67,8 @@ public class ImageEncryptorImpl implements ImageEncryptor {
         this.segmentationPrng = SecureRandom.getInstance("SHA1PRNG");
         this.segmentationPrng.setSeed(keySegmentation);
 
-        this.attemptCount = 0;
+        this.attemptCount = new AtomicInteger(0);
+        this.successfulAttempt = 0;
         this.fractal = null;
 
         log.info("Сессия подготовлена, сгенерирована новая соль");
@@ -70,15 +80,86 @@ public class ImageEncryptorImpl implements ImageEncryptor {
      */
     @Override
     public BufferedImage generateNextFractal(int width, int height) {
-        attemptCount++;
+        successfulAttempt = attemptCount.incrementAndGet();
         MandelbrotParams params = mandelbrotService.generateParams(paramsPrng);
         log.debug("Генерация фрактала: попытка {}, params={}", attemptCount, params);
 
-        fractal = mandelbrotService.generateImage(
+        fractal = fractalGenerator.generate(
                 width, height,
                 params.zoom(), params.offsetX(), params.offsetY(), params.maxIter()
         );
         return fractal;
+    }
+
+    @Override
+    public BufferedImage findValidFractalParallel(int width, int height) {
+        int cpuCores = Runtime.getRuntime().availableProcessors();
+        int workers = Math.max(1, cpuCores - 1);
+        ExecutorService executor = Executors.newFixedThreadPool(workers);
+        AtomicReference<BufferedImage> resultImage = new AtomicReference<>(null);
+        final int maxAttempts = 100;
+        final Object lock = new Object();   // для синхронизации счётчика и генерации параметров
+
+        Callable<Void> searchTask = () -> {
+            while (true) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return null;
+                }
+
+                MandelbrotParams params;
+                int currentAttempt;
+
+                synchronized (lock) {
+                    if (resultImage.get() != null || attemptCount.get() >= maxAttempts) {
+                        return null;   // результат уже найден или лимит исчерпан
+                    }
+                    currentAttempt = attemptCount.incrementAndGet();
+                    params = mandelbrotService.generateParams(paramsPrng);
+                }
+
+                BufferedImage img = fractalGenerator.generate(
+                        width, height,
+                        params.zoom(), params.offsetX(), params.offsetY(), params.maxIter()
+                );
+
+                if (mandelbrotService.isFractalValid(img)) {
+                    synchronized (lock) {
+                        if (resultImage.compareAndSet(null, img)) {
+                            successfulAttempt = currentAttempt;
+                            log.info("Валидный фрактал найден на попытке {}", currentAttempt);
+                        }
+                    }
+                    return null;   // независимо от того, мы ли установили результат, выходим
+                }
+            }
+        };
+
+        List<Future<Void>> futures = new ArrayList<>();
+        for (int i = 0; i < workers; i++) {
+            futures.add(executor.submit(searchTask));
+        }
+
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
+        }
+
+        // отменяем оставшиеся задачи
+        for (Future<Void> f : futures) {
+            f.cancel(true);
+        }
+
+        if (resultImage.get() == null) {
+            throw new RuntimeException("Не удалось получить качественный фрактал за " + maxAttempts + " попыток");
+        }
+
+        this.fractal = resultImage.get();
+        return this.fractal;
     }
 
     /**
@@ -99,16 +180,15 @@ public class ImageEncryptorImpl implements ImageEncryptor {
         int height = originalImage.getHeight();
 
         if (fractal == null || fractal.getWidth() != width || fractal.getHeight() != height) {
-            log.warn("Фрактал отсутствует или не соответствует размеру, генерируем заново");
-            generateNextFractal(width, height);
+            log.info("Запуск параллельного поиска валидного фрактала...");
+            findValidFractalParallel(width, height);
         }
 
-        BufferedImage xored = XOR.performXOR(originalImage, fractal);
+        BufferedImage xored = xorOperation.xor(originalImage, fractal);
         BufferedImage finalImage = segmentShuffler.segmentAndShuffle(xored, segmentationPrng).shuffledImage();
 
-        return new EncryptedData(sessionSalt, attemptCount, 0, 0,
-                width, height, width, height,
-                imageUtils.imageToBytes(finalImage));
+        return new EncryptedData(sessionSalt, successfulAttempt, 0, 0,
+                width, height, width, height, imageUtils.imageToBytes(finalImage));
     }
 
     /**
@@ -129,12 +209,12 @@ public class ImageEncryptorImpl implements ImageEncryptor {
         int areaHeight = (int) selectedArea.getHeight();
 
         if (fractal == null || fractal.getWidth() != areaWidth || fractal.getHeight() != areaHeight) {
-            log.warn("Фрактал отсутствует или не соответствует размеру области, генерируем заново");
-            generateNextFractal(areaWidth, areaHeight);
+            log.info("Запуск параллельного поиска фрактала под размер области...");
+            findValidFractalParallel(areaWidth, areaHeight);
         }
 
         BufferedImage areaImage = originalImage.getSubimage(sx, sy, areaWidth, areaHeight);
-        BufferedImage xoredArea = XOR.performXOR(areaImage, fractal);
+        BufferedImage xoredArea = xorOperation.xor(areaImage, fractal);
         BufferedImage shuffledArea = segmentShuffler.segmentAndShuffle(xoredArea, segmentationPrng).shuffledImage();
 
         BufferedImage finalImage = new BufferedImage(origWidth, origHeight, BufferedImage.TYPE_INT_RGB);
@@ -143,8 +223,7 @@ public class ImageEncryptorImpl implements ImageEncryptor {
         g.drawImage(shuffledArea, sx, sy, null);
         g.dispose();
 
-        return new EncryptedData(sessionSalt, attemptCount, sx, sy,
-                areaWidth, areaHeight, origWidth, origHeight,
-                imageUtils.imageToBytes(finalImage));
+        return new EncryptedData(sessionSalt, successfulAttempt, sx, sy, areaWidth, areaHeight,
+                origWidth, origHeight, imageUtils.imageToBytes(finalImage));
     }
 }

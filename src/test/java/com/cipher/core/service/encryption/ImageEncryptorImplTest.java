@@ -3,7 +3,9 @@ package com.cipher.core.service.encryption;
 import com.cipher.core.dto.MandelbrotParams;
 import com.cipher.core.dto.encryption.EncryptedData;
 import com.cipher.core.dto.segmentation.SegmentationResult;
+import com.cipher.core.generator.FractalGenerator;
 import com.cipher.core.service.encryption.impl.ImageEncryptorImpl;
+import com.cipher.core.service.encryption.util.XOROperation;
 import com.cipher.core.utils.ImageUtils;
 import javafx.geometry.Rectangle2D;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,8 @@ class ImageEncryptorImplTest {
     @Mock private MandelbrotService mandelbrotService;
     @Mock private SegmentShuffler segmentShuffler;
     @Mock private ImageUtils imageUtils;
+    @Mock private FractalGenerator fractalGenerator;
+    @Mock private XOROperation xorOperation;
 
     @InjectMocks
     private ImageEncryptorImpl imageEncryptor;
@@ -46,14 +50,16 @@ class ImageEncryptorImplTest {
         testImageBytes = new byte[100 * 80 * 3];
         testParams = new MandelbrotParams(10000, -0.5, 0.0, 250);
 
-        lenient().when(mandelbrotService.generateParams(any(SecureRandom.class)))
-                .thenReturn(testParams);
-        lenient().when(mandelbrotService.generateImage(anyInt(), anyInt(), anyDouble(), anyDouble(), anyDouble(), anyInt()))
+        // Настройка моков (lenient, чтобы строгий UnnecessaryStubbing не мешал)
+        lenient().when(mandelbrotService.generateParams(any(SecureRandom.class))).thenReturn(testParams);
+        lenient().when(fractalGenerator.generate(anyInt(), anyInt(), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(fractalImage);
         lenient().when(segmentShuffler.segmentAndShuffle(any(BufferedImage.class), any(SecureRandom.class)))
                 .thenReturn(new SegmentationResult(shuffledImage, 1, 100, 80, null));
-        lenient().when(imageUtils.imageToBytes(any(BufferedImage.class)))
-                .thenReturn(testImageBytes);
+        lenient().when(imageUtils.imageToBytes(any(BufferedImage.class))).thenReturn(testImageBytes);
+        lenient().when(xorOperation.xor(any(BufferedImage.class), any(BufferedImage.class))).thenReturn(shuffledImage);
+        // Для тестов, где вызывается findValidFractalParallel, валидация всегда проходит
+        lenient().when(mandelbrotService.isFractalValid(any(BufferedImage.class))).thenReturn(true);
     }
 
     @Test
@@ -67,7 +73,7 @@ class ImageEncryptorImplTest {
         BufferedImage result = imageEncryptor.generateNextFractal(100, 80);
         assertNotNull(result);
         verify(mandelbrotService).generateParams(any(SecureRandom.class));
-        verify(mandelbrotService).generateImage(eq(100), eq(80), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(fractalGenerator).generate(eq(100), eq(80), anyDouble(), anyDouble(), anyDouble(), anyInt());
     }
 
     @Test
@@ -87,16 +93,18 @@ class ImageEncryptorImplTest {
 
         verify(imageUtils).imageToBytes(any());
         verify(segmentShuffler).segmentAndShuffle(any(), any());
+        // Фрактал уже есть, параллельный поиск не запускается
+        verify(mandelbrotService, never()).isFractalValid(any());
     }
 
     @Test
     void encryptWhole_withoutFractal_shouldGenerateAutomatically() throws Exception {
         imageEncryptor.prepareSession(sharedSecret);
-        // Не вызываем generateNextFractal – должен сгенерироваться сам
         EncryptedData data = imageEncryptor.encryptWhole(testImage);
 
         assertNotNull(data);
-        verify(mandelbrotService, atLeastOnce()).generateImage(eq(100), eq(80), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(fractalGenerator, atLeastOnce()).generate(eq(100), eq(80), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(mandelbrotService, atLeastOnce()).isFractalValid(any());
         verify(segmentShuffler).segmentAndShuffle(any(), any());
         verify(imageUtils).imageToBytes(any());
     }
@@ -107,7 +115,7 @@ class ImageEncryptorImplTest {
         Rectangle2D area = new Rectangle2D(10, 10, 50, 40);
 
         BufferedImage areaFractal = new BufferedImage(50, 40, BufferedImage.TYPE_INT_RGB);
-        when(mandelbrotService.generateImage(eq(50), eq(40), anyDouble(), anyDouble(), anyDouble(), anyInt()))
+        when(fractalGenerator.generate(eq(50), eq(40), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(areaFractal);
         BufferedImage areaShuffled = new BufferedImage(50, 40, BufferedImage.TYPE_INT_RGB);
         when(segmentShuffler.segmentAndShuffle(any(), any()))
@@ -124,7 +132,9 @@ class ImageEncryptorImplTest {
         assertEquals(40, data.areaHeight());
         assertNotNull(data.imageBytes());
 
-        verify(mandelbrotService).generateImage(eq(50), eq(40), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(fractalGenerator, atLeastOnce()).generate(
+                eq(50), eq(40), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(mandelbrotService, atLeastOnce()).isFractalValid(any());
         verify(segmentShuffler).segmentAndShuffle(any(), any());
         verify(imageUtils).imageToBytes(any());
     }
@@ -132,11 +142,11 @@ class ImageEncryptorImplTest {
     @Test
     void encryptPart_withFractalSizeMismatch_shouldGenerateNew() throws Exception {
         imageEncryptor.prepareSession(sharedSecret);
-        imageEncryptor.generateNextFractal(100, 80); // большой фрактал
+        imageEncryptor.generateNextFractal(100, 80);
         Rectangle2D area = new Rectangle2D(0, 0, 30, 30);
 
         BufferedImage areaFractal = new BufferedImage(30, 30, BufferedImage.TYPE_INT_RGB);
-        when(mandelbrotService.generateImage(eq(30), eq(30), anyDouble(), anyDouble(), anyDouble(), anyInt()))
+        when(fractalGenerator.generate(eq(30), eq(30), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(areaFractal);
         BufferedImage areaShuffled = new BufferedImage(30, 30, BufferedImage.TYPE_INT_RGB);
         when(segmentShuffler.segmentAndShuffle(any(), any()))
@@ -144,8 +154,9 @@ class ImageEncryptorImplTest {
 
         EncryptedData data = imageEncryptor.encryptPart(testImage, area);
         assertNotNull(data);
-        // Должен быть вызван generateImage для размера 30x30
-        verify(mandelbrotService).generateImage(eq(30), eq(30), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(fractalGenerator, atLeastOnce()).generate(
+                eq(30), eq(30), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        verify(mandelbrotService, atLeastOnce()).isFractalValid(any());
     }
 
     @Test

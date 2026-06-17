@@ -1,6 +1,7 @@
 package com.cipher.core.service.encryption;
 
 import com.cipher.core.dto.MandelbrotParams;
+import com.cipher.core.generator.impl.CPUFractalGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import java.awt.*;
@@ -14,7 +15,7 @@ class MandelbrotServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new MandelbrotService();
+        service = new MandelbrotService(new CPUFractalGenerator());
     }
 
     @Test

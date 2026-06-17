@@ -2,6 +2,7 @@ package com.cipher.core.service.encryption;
 
 import com.cipher.core.dto.MandelbrotParams;
 import com.cipher.core.service.encryption.impl.ImageDecryptorImpl;
+import com.cipher.core.service.encryption.util.XOROperation;
 import com.cipher.core.service.network.CryptoKeyManager;
 import com.cipher.core.utils.ImageUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ class ImageDecryptorImplTest {
     @Mock private SegmentShuffler segmentShuffler;
     @Mock private ImageUtils imageUtils;
     @Mock private CryptoKeyManager cryptoKeyManager;
+    @Mock private XOROperation xorOperation;
 
     @InjectMocks
     private ImageDecryptorImpl imageDecryptor;

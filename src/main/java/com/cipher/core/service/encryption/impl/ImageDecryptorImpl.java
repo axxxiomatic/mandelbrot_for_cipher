@@ -17,6 +17,7 @@ import com.cipher.core.service.encryption.MandelbrotService;
 import com.cipher.core.service.encryption.util.XOR;
 import com.cipher.core.service.network.CryptoKeyManager;
 import com.cipher.core.utils.ImageUtils;
+import com.cipher.core.service.encryption.util.XOROperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ public class ImageDecryptorImpl implements ImageDecryptor {
     private final SegmentShuffler segmentShuffler;
     private final ImageUtils imageUtils;
     private final CryptoKeyManager cryptoKeyManager;
+    private final XOROperation xorOperation;
 
     /**
      * Дешифрует изображение из бинарного файла, созданного методом encryptWhole.
@@ -110,7 +112,7 @@ public class ImageDecryptorImpl implements ImageDecryptor {
         );
 
         // XOR области с фракталом
-        BufferedImage decryptedArea = XOR.performXOR(unshuffledArea, fractal);
+        BufferedImage decryptedArea = xorOperation.xor(unshuffledArea, fractal);
 
         // Вставляем расшифрованную область обратно в полное изображение
         BufferedImage result = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_RGB);

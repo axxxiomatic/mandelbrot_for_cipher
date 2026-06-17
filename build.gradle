@@ -35,6 +35,21 @@ javafx {
     modules = ['javafx.controls', 'javafx.fxml', 'javafx.graphics', 'javafx.swing']
 }
 
+def jcudaNativeDir = layout.buildDirectory.dir("jcuda-native")
+def jcudaNativeJar = jcudaNativeDir.map { it.file("jcuda-natives-12.0.0-windows-x86_64.jar") }
+
+tasks.register('downloadJcudaNatives', DefaultTask) {
+    doLast {
+        def dest = jcudaNativeJar.get().asFile
+        if (!dest.exists()) {
+            dest.parentFile.mkdirs()
+            def url = new URL('https://repo1.maven.org/maven2/org/jcuda/jcuda-natives/12.0.0/jcuda-natives-12.0.0-windows-x86_64.jar')
+            println "Downloading JCuda native library..."
+            url.withInputStream { is -> dest.withOutputStream { it << is } }
+        }
+    }
+}
+
 dependencies {
     //===JavaFX зависимости===========
     implementation 'org.openjfx:javafx-controls:21.0.8'
@@ -54,6 +69,14 @@ dependencies {
 //    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
 
     //=======================
+
+    // === JCuda (GPU) ===
+    implementation('org.jcuda:jcuda:12.0.0') {
+        exclude group: 'org.jcuda', module: 'jcuda-natives'
+    }
+    runtimeOnly files(jcudaNativeJar) {
+        builtBy 'downloadJcudaNatives'
+    }
 
     //===Другие зависимости============
     implementation 'org.slf4j:slf4j-api:2.0.7'
@@ -176,6 +199,11 @@ tasks.register('zip', Zip) {
     from 'LICENSE'
     archiveFileName = "mandelbrot_for_cipher-${version}.zip"
     destinationDirectory = layout.buildDirectory.dir('dist')
+}
+
+// Заставить compileJava зависеть от загрузки
+tasks.named('compileJava') {
+    dependsOn 'downloadJcudaNatives'
 }
 
 // Для запуска в IDE через Gradle

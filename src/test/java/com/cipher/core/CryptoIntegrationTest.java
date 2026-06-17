@@ -1,8 +1,11 @@
 package com.cipher.core;
 
 import com.cipher.core.dto.encryption.EncryptedData;
+import com.cipher.core.generator.impl.CPUFractalGenerator;
 import com.cipher.core.service.encryption.*;
 import com.cipher.core.service.encryption.impl.*;
+import com.cipher.core.service.encryption.util.XOROperation;
+import com.cipher.core.service.encryption.util.impl.CPUXOROperation;
 import com.cipher.core.service.network.CryptoKeyManager;
 import com.cipher.core.service.network.impl.ECDHCryptoKeyManagerImpl;
 import com.cipher.core.utils.FileManager;
@@ -35,6 +38,8 @@ class CryptoIntegrationTest {
     private CryptoKeyManager bobKeyManager;
     private InetAddress bobAddress;
     private ECDHService ecdhService;
+    private CPUFractalGenerator cpuFractalGenerator;
+    private XOROperation cpuXorOperation;
 
     // Заглушки UI (минимальные, без моков)
     private static class NoOpSceneManager extends com.cipher.core.utils.SceneManager {
@@ -51,6 +56,8 @@ class CryptoIntegrationTest {
     void setUp() throws Exception {
         bobAddress = InetAddress.getByName("192.168.1.2");
         InetAddress aliceAddress = InetAddress.getByName("192.168.1.1");
+        cpuFractalGenerator = new CPUFractalGenerator();
+        cpuXorOperation = new CPUXOROperation();
 
         fileManager = new FileManager(new NoOpDialogDisplayer(), new NoOpSceneManager(), new ImageUtils()) {
             @Override public String getTempPath() { return tempDir.toString() + File.separator; }
@@ -58,7 +65,7 @@ class CryptoIntegrationTest {
         fileManager.createTempFolder();
 
         imageUtils = new ImageUtils();
-        mandelbrotService = new MandelbrotService();
+        mandelbrotService = new MandelbrotService(cpuFractalGenerator);
         shuffler = new ImageSegmentShufflerImpl();
 
         // Создаём ECDH сервис
@@ -112,10 +119,11 @@ class CryptoIntegrationTest {
     @DisplayName("ИТ-1: generateNextFractal возвращает фрактал и сохраняет его в поле")
     void testGenerateNextFractalReturnsAndSavesFractal() throws Exception {
         byte[] secret = aliceKeyManager.getMasterSeedFromDH(bobAddress);
-        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(mandelbrotService, shuffler, imageUtils);
+        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(
+                mandelbrotService, shuffler, imageUtils, cpuFractalGenerator, cpuXorOperation);
         encrypt.prepareSession(secret);
 
-        BufferedImage image = createTestImage(200, 200);
+        BufferedImage image = createTestImage(640, 640);
         BufferedImage generatedFractal = encrypt.generateNextFractal(image.getWidth(), image.getHeight());
 
         assertNotNull(generatedFractal, "generateNextFractal должен возвращать не-null фрактал");
@@ -136,10 +144,11 @@ class CryptoIntegrationTest {
     @DisplayName("ИТ-2: encryptWhole успешно шифрует изображение (автогенерация фрактала)")
     void testEncryptWholeCompletesSuccessfully() throws Exception {
         byte[] secret = aliceKeyManager.getMasterSeedFromDH(bobAddress);
-        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(mandelbrotService, shuffler, imageUtils);
+        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(
+                mandelbrotService, shuffler, imageUtils, cpuFractalGenerator, cpuXorOperation);
         encrypt.prepareSession(secret);
 
-        BufferedImage image = createTestImage(200, 200);
+        BufferedImage image = createTestImage(640, 640);
         encrypt.generateNextFractal(image.getWidth(), image.getHeight());
 
         assertDoesNotThrow(() -> encrypt.encryptWhole(image),
@@ -151,10 +160,11 @@ class CryptoIntegrationTest {
     void testEndToEndEncryptDecrypt() throws Exception {
         byte[] aliceSecret = aliceKeyManager.getMasterSeedFromDH(bobAddress);
 
-        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(mandelbrotService, shuffler, imageUtils);
+        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(
+                mandelbrotService, shuffler, imageUtils, cpuFractalGenerator, cpuXorOperation);
         encrypt.prepareSession(aliceSecret);
 
-        BufferedImage original = createTestImage(300, 300);
+        BufferedImage original = createTestImage(640, 640);
         encrypt.generateNextFractal(original.getWidth(), original.getHeight());
         EncryptedData encryptedData = encrypt.encryptWhole(original);
 
@@ -171,7 +181,8 @@ class CryptoIntegrationTest {
                 encryptedData.areaHeight()
         );
 
-        ImageDecryptorImpl decrypt = new ImageDecryptorImpl(mandelbrotService, shuffler, imageUtils, bobKeyManager);
+        ImageDecryptorImpl decrypt = new ImageDecryptorImpl(
+                mandelbrotService, shuffler, imageUtils, bobKeyManager, cpuXorOperation);
         BufferedImage decrypted = decrypt.decryptImage(encryptedFile);
 
         assertImagesEqual(original, decrypted);
@@ -181,11 +192,12 @@ class CryptoIntegrationTest {
     @DisplayName("ИТ-4: Частичное шифрование области и дешифрование")
     void testPartialEncryptDecrypt() throws Exception {
         byte[] secret = aliceKeyManager.getMasterSeedFromDH(bobAddress);
-        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(mandelbrotService, shuffler, imageUtils);
+        ImageEncryptorImpl encrypt = new ImageEncryptorImpl(
+                mandelbrotService, shuffler, imageUtils, cpuFractalGenerator, cpuXorOperation);
         encrypt.prepareSession(secret);
 
-        BufferedImage original = createTestImage(400, 300);
-        javafx.geometry.Rectangle2D area = new javafx.geometry.Rectangle2D(50, 60, 200, 150);
+        BufferedImage original = createTestImage(640, 480);
+        javafx.geometry.Rectangle2D area = new javafx.geometry.Rectangle2D(50, 40, 370, 280);
 
         encrypt.generateNextFractal(original.getWidth(), original.getHeight());
         EncryptedData encryptedData = encrypt.encryptPart(original, area);
@@ -202,7 +214,8 @@ class CryptoIntegrationTest {
                 encryptedData.areaHeight()
         );
 
-        ImageDecryptorImpl decrypt = new ImageDecryptorImpl(mandelbrotService, shuffler, imageUtils, bobKeyManager);
+        ImageDecryptorImpl decrypt = new ImageDecryptorImpl(
+                mandelbrotService, shuffler, imageUtils, bobKeyManager, cpuXorOperation);
         BufferedImage decrypted = decrypt.decryptImage(encryptedFile);
 
         assertImagesEqual(original, decrypted);
@@ -215,7 +228,8 @@ class CryptoIntegrationTest {
         int[][] sizes = {{640, 480}, {1024, 768}, {1920, 1080}};
 
         for (int[] size : sizes) {
-            ImageEncryptorImpl encrypt = new ImageEncryptorImpl(mandelbrotService, shuffler, imageUtils);
+            ImageEncryptorImpl encrypt = new ImageEncryptorImpl(
+                    mandelbrotService, shuffler, imageUtils, cpuFractalGenerator, cpuXorOperation);
             encrypt.prepareSession(secret);
 
             BufferedImage original = createTestImage(size[0], size[1]);
@@ -234,7 +248,8 @@ class CryptoIntegrationTest {
                     encryptedData.areaHeight()
             );
 
-            ImageDecryptorImpl decrypt = new ImageDecryptorImpl(mandelbrotService, shuffler, imageUtils, bobKeyManager);
+            ImageDecryptorImpl decrypt = new ImageDecryptorImpl(
+                    mandelbrotService, shuffler, imageUtils, bobKeyManager, cpuXorOperation);
             BufferedImage decrypted = decrypt.decryptImage(encryptedFile);
 
             assertImagesEqual(original, decrypted);
@@ -253,7 +268,8 @@ class CryptoIntegrationTest {
         File badFile = tempDir.resolve("corrupted.bin").toFile();
         Files.write(badFile.toPath(), corrupted);
 
-        ImageDecryptorImpl decrypt = new ImageDecryptorImpl(mandelbrotService, shuffler, imageUtils, bobKeyManager);
+        ImageDecryptorImpl decrypt = new ImageDecryptorImpl(
+                mandelbrotService, shuffler, imageUtils, bobKeyManager, cpuXorOperation);
 
         assertThrows(Exception.class, () -> decrypt.decryptImage(badFile),
                 "Дешифрование битого файла должно выбрасывать исключение");

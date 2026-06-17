@@ -121,19 +121,12 @@ public class EncryptGenerateController {
         currentTask = new Task<Image>() {
             @Override
             protected Image call() throws Exception {
-                int maxAttempts = 50;
-                for (int i = 0; i < maxAttempts; i++) {
-                    if (isCancelled()) return null;
-
-                    BufferedImage fractal = imageEncryptor.generateNextFractal(
-                            originalImage.getWidth(), originalImage.getHeight());
-                    if (!mandelbrotService.isFractalValid(fractal)) {
-                        ConsoleManager.log("Попытка " + (i+1) + ": фрактал не подходит, продолжаем...");
-                        continue;
-                    }
-                    return SwingFXUtils.toFXImage(fractal, null);
+                BufferedImage fractal = imageEncryptor.findValidFractalParallel(
+                        originalImage.getWidth(), originalImage.getHeight());
+                if (fractal == null) {
+                    throw new RuntimeException("Не удалось получить качественный фрактал");
                 }
-                throw new RuntimeException("Не удалось получить качественный фрактал");
+                return SwingFXUtils.toFXImage(fractal, null);
             }
         };
 

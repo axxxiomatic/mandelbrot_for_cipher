@@ -1,5 +1,12 @@
 package com.cipher.core.config;
 
+import com.cipher.core.generator.FractalGenerator;
+import com.cipher.core.generator.impl.CPUFractalGenerator;
+import com.cipher.core.service.encryption.util.XOROperation;
+import com.cipher.core.service.encryption.util.impl.CPUXOROperation;
+import com.cipher.gpu.CudaDetector;
+import com.cipher.gpu.GPUFractalGenerator;
+import com.cipher.gpu.GPUXOROperation;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -21,5 +28,23 @@ public class AppConfig {
             });
             return thread;
         });
+    }
+
+    @Bean
+    public FractalGenerator fractalGenerator() {
+        if (CudaDetector.isCudaAvailable()) {
+            return new GPUFractalGenerator();
+        } else {
+            return new CPUFractalGenerator();
+        }
+    }
+
+    @Bean
+    public XOROperation xorOperation() {
+        if (CudaDetector.isCudaAvailable()) {
+            return new GPUXOROperation();
+        } else {
+            return new CPUXOROperation();
+        }
     }
 }

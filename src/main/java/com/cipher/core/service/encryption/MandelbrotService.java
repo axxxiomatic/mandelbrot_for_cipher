@@ -1,6 +1,7 @@
 package com.cipher.core.service.encryption;
 
 import com.cipher.core.dto.MandelbrotParams;
+import com.cipher.core.generator.FractalGenerator;
 import com.cipher.core.threading.MandelbrotThread;
 
 import javax.swing.*;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MandelbrotService extends JPanel {
     private static final Logger logger = LoggerFactory.getLogger(MandelbrotService.class);
+    private final FractalGenerator generator;
 
     @Getter @Setter
     private int targetWidth;
@@ -82,48 +85,8 @@ public class MandelbrotService extends JPanel {
      */
     public BufferedImage generateImage(int width, int height,
                                        double ZOOM, double offsetX, double offsetY, int MAX_ITER) {
-        if (width <= 0 || height <= 0) {
-            throw new IllegalArgumentException("Width and height must be positive");
-        }
-        if (ZOOM <= 0) {
-            throw new IllegalArgumentException("Zoom must be positive: " + ZOOM);
-        }
-        if (MAX_ITER <= 0) {
-            throw new IllegalArgumentException("MAX_ITER must be positive: " + MAX_ITER);
-        }
-
-        BufferedImage resultImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-
-        try (ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())) {
-            int processors = Runtime.getRuntime().availableProcessors();
-            int chunkWidth = width / processors;
-
-            List<Future<?>> futures = new ArrayList<>();
-            for (int i = 0; i < processors; i++) {
-                int startX = i * chunkWidth;
-                int w = (i == processors - 1) ? width - startX : chunkWidth;
-
-                futures.add(executor.submit(new MandelbrotThread(
-                        startX, 0, w, height,
-                        ZOOM, MAX_ITER, offsetX, offsetY, resultImage
-                )));
-            }
-
-            for (Future<?> future : futures) {
-                future.get();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.error("Генерация прервана", e);
-            return null;
-        } catch (ExecutionException e) {
-            logger.error("Ошибка в потоке вычислений", e);
-            throw new RuntimeException("Ошибка генерации фрактала", e);
-        }
-
-        this.image = resultImage;
-        repaint();
-        return resultImage;
+        this.image = generator.generate(width, height, ZOOM, offsetX, offsetY, MAX_ITER);
+        return this.image;
     }
 
     /**
