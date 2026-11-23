@@ -1,0 +1,29 @@
+spring:
+  cloud:
+    refresh:
+      enabled: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/com_db?currentSchema=public
+    username: ${BD_LOGIN}
+    password: ${BD_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+    database: postgresql
+#  data:
+#    redis:
+#      host: ${REDIS_HOST}
+#      port: ${REDIS_PORT}
+      # password:
+      # database: 0
+management:
+  endpoint:
+    refresh:
+      enabled: false

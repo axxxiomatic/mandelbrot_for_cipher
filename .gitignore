@@ -1,7 +1,23 @@
 ### IntelliJ IDEA ###
+.idea
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+
+### Project ###
+temp
+config.xml
+.env
+releases
+
+###Gradle###
+.gradle
+build/
+*/build/
+**/build/
+**/build/**
+*.lock
+*.jar
 
 ### Eclipse ###
 .apt_generated
