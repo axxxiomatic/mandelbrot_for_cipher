@@ -21,8 +21,11 @@ import static jcuda.driver.JCudaDriver.cuModuleLoadData;
  *       ({@code sm_XY}). Снимает зависимость от версии драйвера: заранее собранный PTX 8.4
  *       (nvcc 12.4) требует драйвер ветки 550+, иначе {@code cuModuleLoadData} возвращает
  *       {@code CUDA_ERROR_UNSUPPORTED_PTX_VERSION}, и приложение падало в обход CPU-fallback.</li>
- *   <li><b>Предсобранный PTX</b> — резервный путь, если {@code jnvrtc-natives} недоступны
- *       (NVRTC поставляется отдельным нативным артефактом).</li>
+ *   <li><b>Предсобранный PTX</b> — резервный путь, если NVRTC недоступен. JNI-биндинг
+ *       {@code jcuda.nvrtc.JNvrtc} лежит в артефакте {@code org.jcuda:jcuda}, а его нативная
+ *       библиотека {@code JNvrtc-…dll} — в {@code jcuda-natives}. При этом JNI-слой сам
+ *       загружает {@code nvrtc64_*.dll} из установленного CUDA Toolkit: без Toolkit биндинг
+ *       падает с {@code UnsatisfiedLinkError}, и мы уходим в этот резервный путь.</li>
  * </ol>
  * Компиляция идёт с {@code --fmad=false}: FMA-контракция меняет число итераций у границы
  * множества и ломает побитовый паритет с CPU-палитрой ({@link com.cipher.core.generator.FractalPalette}).

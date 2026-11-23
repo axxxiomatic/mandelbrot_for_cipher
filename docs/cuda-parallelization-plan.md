@@ -206,7 +206,7 @@ P2 #16–#19 аллокации/pinned/batch   -> добираем остато�
 | 8 | Один контекст, освобождается | `CudaDevice` (`REFERENCES`, `cuDevicePrimaryCtxRelease`) | `shutdown()` бэкендов в Spring; повторная инициализация после освобождения |
 | 9–10 | Без 100 конкурентных генераций; исключения задач | `ImageEncryptorImpl.searchValidFractal` (один поток поиска, `Future.get`), `CPUFractalGenerator` (`future.get`) | `ImageEncryptorImplTest` |
 | 11 | Отмена | `MandelbrotThread` (`isInterrupted`), `CPUFractalGenerator` (cancel), таймаут поиска | ревью; ручная проверка закрытия окна |
-| 12 | NVRTC вместо фиксированного PTX | `gpu/KernelCompiler.java` (`--fmad=false`, fallback на `.ptx`), `build.gradle` (`jnvrtc-natives`) | лог «Ядро … скомпилировано через NVRTC для sm_XY» |
+| 12 | NVRTC вместо фиксированного PTX | `gpu/KernelCompiler.java` (`--fmad=false`, fallback на `.ptx`); классы `jcuda.nvrtc` берутся из `org.jcuda:jcuda`, dll — из `jcuda-natives` (артефакта `org.jcuda:jnvrtc` не существует) | лог «Ядро … скомпилировано через NVRTC для sm_XY» |
 | 13 | Переключатель бэкенда | `-Dcipher.cuda=false` в `CudaDevice`/`GpuBackends`, `build.gradle` пробрасывает в тесты | запуск с флагом → CPU-логи |
 | 14 | Логи фаз | `GPUFractalGenerator.lastKernelNanos/lastCopyNanos`, лог найденного кандидата | `benchmarkCuda` печатает медианы |
 | 15 | Валидация на GPU | `gpu/GPUFractalValidator.java`, `resources/cuda/validate.cu` (37 счётчиков) | GPU и CPU дают одинаковые метрики; CPU подтверждает первый успех |
@@ -231,3 +231,8 @@ P2 #16–#19 аллокации/pinned/batch   -> добираем остато�
    Отбракованные кандидаты на CPU не пересчитываются — именно это и было узким местом.
 3. **`cuMemAllocHost` ограничен лимитом ОС** на закреплённую память; при отказе реализован
    pageable-путь, поэтому функциональность не страдает, только скорость копирования.
+4. **NVRTC требует установленного CUDA Toolkit**, а не только драйвера: JNI-обёртка
+   `JNvrtc-12.0.0-windows-x86_64.dll` (из `jcuda-natives`) загружает `nvrtc64_*.dll` и
+   `nvrtc-builtins64_*.dll`, которые поставляются только с Toolkit. Без Toolkit ядро
+   компилируется не будет, и `KernelCompiler` попытается взять предсобранный `.ptx`
+   (см. п. 1), а при его отсутствии весь GPU-контур уходит в CPU-fallback.

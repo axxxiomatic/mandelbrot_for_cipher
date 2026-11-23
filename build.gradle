@@ -38,26 +38,25 @@ javafx {
 def jcudaNativeDir = layout.buildDirectory.dir("jcuda-native")
 def jcudaNativeJar = jcudaNativeDir.map { it.file("jcuda-natives-12.0.0-windows-x86_64.jar") }
 
-def jnvrtcNativeJar = jcudaNativeDir.map { it.file("jnvrtc-natives-12.0.0-windows-x86_64.jar") }
-
 /**
- * Скачивает natives JCuda и JNvrtc (только Windows x86_64 — целевая платформа проекта).
- * NVRTC нужен для компиляции .cu-ядер во время запуска: PTX, вкомпилированный в ресурсы,
- * привязан к версии драйвера, тогда как NVRTC компилирует ядро под архитектуру этой машины.
+ * Скачивает natives JCuda (только Windows x86_64 — целевая платформа проекта).
+ * <p>
+ * Отдельного артефакта {@code org.jcuda:jnvrtc} в Maven Central НЕ существует:
+ * Java-классы NVRTC ({@code jcuda.nvrtc.JNvrtc}) входят в {@code org.jcuda:jcuda},
+ * а нативные библиотеки — в {@code jcuda-natives}, который содержит
+ * {@code lib/*JNvrtc*}, {@code lib/*JCudaDriver*} и {@code lib/*JCudaRuntime*}.
+ * </p>
+ * NVRTC нужен для компиляции .cu-ядер во время запуска: предсобранный PTX привязан
+ * к версии драйвера, тогда как NVRTC компилирует ядро под архитектуру этой машины.
  */
 tasks.register('downloadJcudaNatives', DefaultTask) {
     doLast {
-        def artifacts = [
-            [jcudaNativeJar.get(), 'https://repo1.maven.org/maven2/org/jcuda/jcuda-natives/12.0.0/jcuda-natives-12.0.0-windows-x86_64.jar'],
-            [jnvrtcNativeJar.get(), 'https://repo1.maven.org/maven2/org/jcuda/jnvrtc-natives/12.0.0/jnvrtc-natives-12.0.0-windows-x86_64.jar'],
-        ]
-        artifacts.each { artifact ->
-            File dest = artifact[0]
-            if (!dest.exists()) {
-                dest.parentFile.mkdirs()
-                println "Downloading ${dest.name}..."
-                new URL(artifact[1]).withInputStream { is -> dest.withOutputStream { it << is } }
-            }
+        File dest = jcudaNativeJar.get().asFile
+        if (!dest.exists()) {
+            dest.parentFile.mkdirs()
+            println "Downloading ${dest.name}..."
+            new URL('https://repo1.maven.org/maven2/org/jcuda/jcuda-natives/12.0.0/jcuda-natives-12.0.0-windows-x86_64.jar')
+                    .withInputStream { is -> dest.withOutputStream { it << is } }
         }
     }
 }
@@ -86,11 +85,9 @@ dependencies {
     implementation('org.jcuda:jcuda:12.0.0') {
         exclude group: 'org.jcuda', module: 'jcuda-natives'
     }
-    implementation 'org.jcuda:jnvrtc:12.0.0'
+    // NVRTC (jcuda.nvrtc.JNvrtc) входит в этот же артефакт; отдельного org.jcuda:jnvrtc нет.
+    // Natives (JCudaDriver/JNvrtc dll) подключаются одним jar-ом jcuda-natives ниже.
     runtimeOnly files(jcudaNativeJar) {
-        builtBy 'downloadJcudaNatives'
-    }
-    runtimeOnly files(jnvrtcNativeJar) {
         builtBy 'downloadJcudaNatives'
     }
 
