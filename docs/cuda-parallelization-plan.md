@@ -6,16 +6,16 @@
 
 ---
 
-## 0. Важная оговорка о состоянии кода
+## 0. Статус: задачи P0–P3 реализованы в коде
 
-В ветке `parallel` (база `dda800b`) CUDA-контур остаётся **исходным**: в
-`src/main/java/com/cipher/gpu/` лежат только `CudaDetector`, `GPUFractalGenerator`,
-`GPUXOROperation`, а ядра — `mandelbrot.cu/.ptx`, `xor.cu/.ptx`. Правки палитры,
-типов растра, контекста, валидации и версионирования алгоритма, описанные в предыдущем
-сообщении, **в файлах отсутствуют** — их нужно внести. Ниже они разложены на задачи
-с критериями готовности, а измерительный контур уже лежит в репозитории и готов к запуску.
+Пункты ниже были планом; сейчас они **внесены в файлы** (см. раздел 5 «Что сделано и чем
+подтверждается»). Исходное состояние ветки `parallel` (база `dda800b`, 2026-06-17,
+Gradle 8.13 / JDK 21) описано в `docs/cuda-fork-analysis.md`; таблицы задач оставлены
+как критерии приёмки — по ним принимается результат на целевой машине.
 
-Коммит `dda800b` датирован 2026-06-17, Java-файлы на месте, сборка на Gradle 8.13 / JDK 21.
+Ограничение среды: код собран и прогнан только статически (парсер Java + ревью), потому что
+здесь нет JDK с `javac`, нет GPU и нет Windows. Паритет палитры подтверждается запуском
+`FractalPaletteParityTest` и `benchmarkCuda` на машине с NVIDIA.
 
 ---
 
@@ -189,3 +189,45 @@ P2 #16–#19 аллокации/pinned/batch   -> добираем остато�
 а GPU-часть в принципе исполнима только на Windows x86_64 с драйвером NVIDIA).
 Синтаксис проверен парсером Java; поведение проверяется запуском `benchmarkCuda`
 и `FractalPaletteParityTest` на целевой машине.
+
+
+---
+
+## 5. Что сделано и чем подтверждается
+
+| # | Задача | Где в коде | Чем подтверждается |
+|---|---|---|---|
+| 1–2 | Единая палитра в `double`, без `log` | `core/generator/FractalPalette.java`, `core/threading/MandelbrotThread.java`, `resources/cuda/mandelbrot.cu` | `FractalPaletteParityTest` (0 px), `benchmarkCuda` код 0 |
+| 3 | Клэмп бина тона | `FractalPalette.hueBin`, `validate.cu` | `CPUFractalValidatorTest.hueBin_shouldClampHueOneToLastBin` |
+| 4 | Raster-agnostic типы | `core/utils/RasterUtils.java`, `CPUFractalValidator`, `GPUXOROperation` | `RasterUtilsTest` (round-trip на `INT_RGB`/`INT_ARGB`/`3BYTE_BGR`), `CPUFractalValidatorTest.metrics_shouldWorkFor3ByteBgr` |
+| 5 | Контекст по потокам | `gpu/CudaDevice.java` (primary ctx + `makeCurrent()`) | вызов генерации из потока поиска; лог без `INVALID_CONTEXT` |
+| 6 | Fallback на любой сбой | `gpu/GpuBackends.java` | лог «переключаюсь на CPU»; старт при отсутствии `.dll` |
+| 7 | Версия алгоритма в файле | `FileManager.saveEncryptedImage`, `ImageDecryptorImpl` | `ImageDecryptorImplTest.decryptImage_withOtherAlgorithmVersion_shouldThrow` |
+| 8 | Один контекст, освобождается | `CudaDevice` (`REFERENCES`, `cuDevicePrimaryCtxRelease`) | `shutdown()` бэкендов в Spring; повторная инициализация после освобождения |
+| 9–10 | Без 100 конкурентных генераций; исключения задач | `ImageEncryptorImpl.searchValidFractal` (один поток поиска, `Future.get`), `CPUFractalGenerator` (`future.get`) | `ImageEncryptorImplTest` |
+| 11 | Отмена | `MandelbrotThread` (`isInterrupted`), `CPUFractalGenerator` (cancel), таймаут поиска | ревью; ручная проверка закрытия окна |
+| 12 | NVRTC вместо фиксированного PTX | `gpu/KernelCompiler.java` (`--fmad=false`, fallback на `.ptx`), `build.gradle` (`jnvrtc-natives`) | лог «Ядро … скомпилировано через NVRTC для sm_XY» |
+| 13 | Переключатель бэкенда | `-Dcipher.cuda=false` в `CudaDevice`/`GpuBackends`, `build.gradle` пробрасывает в тесты | запуск с флагом → CPU-логи |
+| 14 | Логи фаз | `GPUFractalGenerator.lastKernelNanos/lastCopyNanos`, лог найденного кандидата | `benchmarkCuda` печатает медианы |
+| 15 | Валидация на GPU | `gpu/GPUFractalValidator.java`, `resources/cuda/validate.cu` (37 счётчиков) | GPU и CPU дают одинаковые метрики; CPU подтверждает первый успех |
+| 16 | Переиспользование буферов | `GPUFractalGenerator.deviceBuffer`, `GPUFractalValidator.imageBuffer`, `GPUXOROperation` | ревью; аллокация только при росте размера |
+| 17 | Pinned-память | `GPUFractalGenerator.download` (`cuMemAllocHost` + `getByteBuffer`) | fallback на pageable при отказе закрепления |
+| 18 | Оценка `float`-ядра | **не делалось** | измерено: `float`-палитра даёт 246/4 млн расхождений — паритет «0 px» недостижим |
+| 19 | Batch-кандидаты | `FractalGenerator.generateBatch`, `mandelbrotBatchKernel`, `batchCapacity()` | пакет по 8 кадров одним запуском ядра на GPU |
+| 20 | Без `extends JPanel` | `core/service/encryption/MandelbrotService.java` | `MandelbrotServiceTest` без Swing-тестов |
+| 21 | LICENSE | `LICENSE` (MIT) | zip-таск собирается |
+| 22 | README | `README.md` | требования, fallback, версия файла, бенчмарк, ограничения |
+| 23 | CI | `.github/workflows/build.yml` | job `build` (CPU, Windows) + job `cuda` (self-hosted с NVIDIA) |
+
+### Известные ограничения реализации
+
+1. **PTX-файлы не приложены.** Fallback-путь `KernelCompiler` ищет `/cuda/*.ptx`; в репозитории
+   их нет, поэтому при отсутствии NVRTC ядро не загрузится и бэкенд уйдёт на CPU (корректно,
+   но без ускорения). Собрать на целевой машине:
+   `nvcc --fmad=false -ptx mandelbrot.cu -o mandelbrot.ptx` (и так же для `xor.cu`, `validate.cu`),
+   положить рядом с `.cu` в `src/main/resources/cuda/`.
+2. **Валидация на GPU не отменяет CPU-подтверждение.** По требованию «первый успех
+   перехватывает CPU» кандидат, прошедший проверку, дополнительно валидируется на CPU.
+   Отбракованные кандидаты на CPU не пересчитываются — именно это и было узким местом.
+3. **`cuMemAllocHost` ограничен лимитом ОС** на закреплённую память; при отказе реализован
+   pageable-путь, поэтому функциональность не страдает, только скорость копирования.

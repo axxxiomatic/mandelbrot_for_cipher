@@ -1,0 +1,71 @@
+name: build
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Основная сборка: CPU-бэкенд. GPU-тесты на раннерах GitHub недоступны,
+  # поэтому они помечены тегом "cuda" и запускаются отдельно (см. job cuda).
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установить JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Права на gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      - name: Сборка и тесты (CPU)
+        # -Dcipher.cuda=false: раннер без NVIDIA, GPU-путь обязан корректно откатиться на CPU.
+        run: .\gradlew build --no-daemon -Dcipher.cuda=false -PexcludeCudaTests
+
+      - name: Публикация отчёта о тестах
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test
+          if-no-files-found: ignore
+
+  # Паритет палитры — единственный тест, который нельзя доверять CPU-раннеру:
+  # без CUDA он помечается skipped, и «зелёный» результат ничего не доказывает.
+  # Запускается только на self-hosted раннере с NVIDIA-картой (Windows x86_64).
+  cuda:
+    if: vars.ENABLE_CUDA_CI == 'true'
+    runs-on: [ self-hosted, windows, x64, cuda ]
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверка драйвера
+        run: nvidia-smi
+
+      - name: Тесты палитры и бенчмарк на GPU
+        run: |
+          .\gradlew test --tests "com.cipher.core.benchmark.FractalPaletteParityTest" --no-daemon
+          .\gradlew benchmarkCuda -Pargs="--sizes 640x480,1280x720 --runs 5 --warmup 1" --no-daemon
+
+      - name: Публикация отчёта
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuda-test-results
+          path: build/reports/tests/test
+          if-no-files-found: ignore
