@@ -38,14 +38,26 @@ javafx {
 def jcudaNativeDir = layout.buildDirectory.dir("jcuda-native")
 def jcudaNativeJar = jcudaNativeDir.map { it.file("jcuda-natives-12.0.0-windows-x86_64.jar") }
 
+def jnvrtcNativeJar = jcudaNativeDir.map { it.file("jnvrtc-natives-12.0.0-windows-x86_64.jar") }
+
+/**
+ * Скачивает natives JCuda и JNvrtc (только Windows x86_64 — целевая платформа проекта).
+ * NVRTC нужен для компиляции .cu-ядер во время запуска: PTX, вкомпилированный в ресурсы,
+ * привязан к версии драйвера, тогда как NVRTC компилирует ядро под архитектуру этой машины.
+ */
 tasks.register('downloadJcudaNatives', DefaultTask) {
     doLast {
-        def dest = jcudaNativeJar.get().asFile
-        if (!dest.exists()) {
-            dest.parentFile.mkdirs()
-            def url = new URL('https://repo1.maven.org/maven2/org/jcuda/jcuda-natives/12.0.0/jcuda-natives-12.0.0-windows-x86_64.jar')
-            println "Downloading JCuda native library..."
-            url.withInputStream { is -> dest.withOutputStream { it << is } }
+        def artifacts = [
+            [jcudaNativeJar.get(), 'https://repo1.maven.org/maven2/org/jcuda/jcuda-natives/12.0.0/jcuda-natives-12.0.0-windows-x86_64.jar'],
+            [jnvrtcNativeJar.get(), 'https://repo1.maven.org/maven2/org/jcuda/jnvrtc-natives/12.0.0/jnvrtc-natives-12.0.0-windows-x86_64.jar'],
+        ]
+        artifacts.each { artifact ->
+            File dest = artifact[0]
+            if (!dest.exists()) {
+                dest.parentFile.mkdirs()
+                println "Downloading ${dest.name}..."
+                new URL(artifact[1]).withInputStream { is -> dest.withOutputStream { it << is } }
+            }
         }
     }
 }
@@ -74,7 +86,11 @@ dependencies {
     implementation('org.jcuda:jcuda:12.0.0') {
         exclude group: 'org.jcuda', module: 'jcuda-natives'
     }
+    implementation 'org.jcuda:jnvrtc:12.0.0'
     runtimeOnly files(jcudaNativeJar) {
+        builtBy 'downloadJcudaNatives'
+    }
+    runtimeOnly files(jnvrtcNativeJar) {
         builtBy 'downloadJcudaNatives'
     }
 
@@ -117,6 +133,16 @@ test {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
     }
+
+    // Тесты палитры требуют реальной CUDA-карты; на CPU-машинах и в CI они пропускаются
+    // через Assumptions. Флаг -PexcludeCudaTests позволяет вообще не запускать их
+    // на сборочных агентах без NVIDIA (экономия времени и чистый отчёт).
+    if (project.hasProperty('excludeCudaTests')) {
+        exclude '**/FractalPaletteParityTest.class'
+    }
+
+    // CPU-путь — режим по умолчанию для тестов: не зависеть от драйвера сборочной машины.
+    systemProperty 'cipher.cuda', System.getProperty('cipher.cuda', 'true')
 }
 
 configurations {

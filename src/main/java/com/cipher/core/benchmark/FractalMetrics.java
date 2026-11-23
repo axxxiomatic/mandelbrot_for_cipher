@@ -6,7 +6,7 @@ import java.awt.image.BufferedImage;
  * Метрики качества изображения-фрактала, используемого как гамма для XOR.
  * <p>
  * Считаются те же величины, на которые опирается критерий пригодности фрактала
- * в {@code MandelbrotService#isFractalValid}: доля «внутренних» пикселей и распределение
+ * в {@link com.cipher.core.generator.FractalValidator}: доля «внутренних» пикселей и распределение
  * цветовых тонов по бинам. В отличие от продовой реализации, здесь нет приведения растра
  * к {@code DataBufferInt}, поэтому метрики корректно считаются для изображений любого типа
  * (в том числе для {@code TYPE_3BYTE_BGR}, который возвращает GPU-генератор).
@@ -22,7 +22,7 @@ public record FractalMetrics(
         double hueEntropyBits
 ) {
 
-    /** Количество бинов гистограммы тона — как в {@code MandelbrotService#checkHueDistribution}. */
+    /** Количество бинов гистограммы тона — как в {@code FractalValidator#BINS}. */
     public static final int BINS = 36;
 
     /** Цвет внутренней области множества (совпадает с CPU- и GPU-генераторами). */
@@ -58,17 +58,9 @@ public record FractalMetrics(
                     internal++;
                     continue;
                 }
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
-                float[] hsv = new float[3];
-                java.awt.Color.RGBtoHSB(r, g, b, hsv);
-                int bin = (int) (hsv[0] * bins);
-                // Тон ровно 1.0 даёт bin == bins — такой пиксель обязан попасть в последний бин,
-                // иначе индекс выходит за границу массива (в CUDA-ядре это порча памяти).
-                if (bin >= bins) {
-                    bin = bins - 1;
-                }
+                // Та же функция, что использует продовый валидатор: критерий в бенчмарке
+                // и в приложении не должен расходиться (включая клэмп индекса бина).
+                int bin = com.cipher.core.generator.FractalPalette.hueBin(rgb, bins);
                 if (bin >= 0) {
                     binCounts[bin]++;
                     considered++;

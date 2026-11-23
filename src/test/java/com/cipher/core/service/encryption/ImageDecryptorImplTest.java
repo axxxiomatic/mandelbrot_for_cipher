@@ -2,6 +2,7 @@ package com.cipher.core.service.encryption;
 
 import com.cipher.core.dto.MandelbrotParams;
 import com.cipher.core.service.encryption.impl.ImageDecryptorImpl;
+import com.cipher.core.service.encryption.impl.ImageEncryptorImpl;
 import com.cipher.core.service.encryption.util.XOROperation;
 import com.cipher.core.service.network.CryptoKeyManager;
 import com.cipher.core.utils.ImageUtils;
@@ -71,7 +72,8 @@ class ImageDecryptorImplTest {
         int attempts = 3;
         int startX = 10, startY = 10;
         byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
-        ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + imageBytes.length);
+        buffer.putInt(ImageEncryptorImpl.ALGORITHM_VERSION);
         buffer.put(new byte[16]); // salt
         buffer.putInt(attempts);
         buffer.putInt(startX);
@@ -102,7 +104,8 @@ class ImageDecryptorImplTest {
     @Test
     void decryptImage_withInvalidLength_shouldThrow() throws Exception {
         int fullWidth = 100, fullHeight = 80;
-        ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + 1);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + 1);
+        buffer.putInt(ImageEncryptorImpl.ALGORITHM_VERSION);
         buffer.put(new byte[16]);
         buffer.putInt(1);
         buffer.putInt(0);
@@ -138,7 +141,8 @@ class ImageDecryptorImplTest {
 
         int attempts = 0;
         byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
-        ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + imageBytes.length);
+        buffer.putInt(ImageEncryptorImpl.ALGORITHM_VERSION);
         buffer.put(new byte[16]);
         buffer.putInt(attempts);
         buffer.putInt(0);
@@ -176,7 +180,8 @@ class ImageDecryptorImplTest {
         int attempts = 1;
         int startX = 5, startY = 5;
         byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
-        ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + imageBytes.length);
+        buffer.putInt(ImageEncryptorImpl.ALGORITHM_VERSION);
         buffer.put(new byte[16]);
         buffer.putInt(attempts);
         buffer.putInt(startX);
@@ -214,7 +219,8 @@ class ImageDecryptorImplTest {
         int attempts = 2;
         int startX = 25, startY = 25;
         byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
-        ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + imageBytes.length);
+        buffer.putInt(ImageEncryptorImpl.ALGORITHM_VERSION);
         buffer.put(new byte[16]);
         buffer.putInt(attempts);
         buffer.putInt(startX);
@@ -236,6 +242,33 @@ class ImageDecryptorImplTest {
     @Test
     void decryptImage_withNullFile_shouldThrow() {
         assertThrows(NullPointerException.class, () -> imageDecryptor.decryptImage(null));
+    }
+
+    @Test
+    void decryptImage_withOtherAlgorithmVersion_shouldThrow() throws Exception {
+        // Файл, зашифрованный другой палитрой гаммы, расшифровать нельзя: XOR с другой гаммой даёт шум.
+        // Лучше явная ошибка, чем «успешно» расшифрованное мусорное изображение.
+        int fullWidth = 10, fullHeight = 10;
+        byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + imageBytes.length);
+        buffer.putInt(ImageEncryptorImpl.ALGORITHM_VERSION - 1);
+        buffer.put(new byte[16]);
+        buffer.putInt(1);
+        buffer.putInt(0);
+        buffer.putInt(0);
+        buffer.putInt(fullWidth);
+        buffer.putInt(fullHeight);
+        buffer.putInt(fullWidth);
+        buffer.putInt(fullHeight);
+        buffer.put(imageBytes);
+        Path tempFile = Files.createTempFile("old", ".bin");
+        Files.write(tempFile, buffer.array());
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> imageDecryptor.decryptImage(tempFile.toFile()));
+        assertTrue(error.getMessage().contains("версией алгоритма"),
+                "сообщение должно объяснять причину, а не просто падать");
+        Files.deleteIfExists(tempFile);
     }
 
     @Test

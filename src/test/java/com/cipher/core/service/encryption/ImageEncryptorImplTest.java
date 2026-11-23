@@ -4,6 +4,7 @@ import com.cipher.core.dto.MandelbrotParams;
 import com.cipher.core.dto.encryption.EncryptedData;
 import com.cipher.core.dto.segmentation.SegmentationResult;
 import com.cipher.core.generator.FractalGenerator;
+import com.cipher.core.generator.FractalValidator;
 import com.cipher.core.service.encryption.impl.ImageEncryptorImpl;
 import com.cipher.core.service.encryption.util.XOROperation;
 import com.cipher.core.utils.ImageUtils;
@@ -29,6 +30,7 @@ class ImageEncryptorImplTest {
     @Mock private SegmentShuffler segmentShuffler;
     @Mock private ImageUtils imageUtils;
     @Mock private FractalGenerator fractalGenerator;
+    @Mock private FractalValidator fractalValidator;
     @Mock private XOROperation xorOperation;
 
     @InjectMocks
@@ -59,7 +61,8 @@ class ImageEncryptorImplTest {
         lenient().when(imageUtils.imageToBytes(any(BufferedImage.class))).thenReturn(testImageBytes);
         lenient().when(xorOperation.xor(any(BufferedImage.class), any(BufferedImage.class))).thenReturn(shuffledImage);
         // Для тестов, где вызывается findValidFractalParallel, валидация всегда проходит
-        lenient().when(mandelbrotService.isFractalValid(any(BufferedImage.class))).thenReturn(true);
+        lenient().when(fractalValidator.backendName()).thenReturn("CPU-тест");
+        lenient().when(fractalValidator.isValid(any(BufferedImage.class))).thenReturn(true);
     }
 
     @Test
@@ -90,11 +93,13 @@ class ImageEncryptorImplTest {
         assertNotNull(data.imageBytes());
         assertArrayEquals(testImageBytes, data.imageBytes());
         assertNotNull(data.sessionSalt());
+        assertEquals(ImageEncryptorImpl.ALGORITHM_VERSION, data.algorithmVersion());
 
         verify(imageUtils).imageToBytes(any());
         verify(segmentShuffler).segmentAndShuffle(any(), any());
-        // Фрактал уже есть, параллельный поиск не запускается
-        verify(mandelbrotService, never()).isFractalValid(any());
+        // Фрактал уже сгенерирован: повторного поиска (с перебором кандидатов) нет.
+        // isValid() при этом вызывался — его вызывает generateNextFractal.
+        verify(fractalValidator, never()).metrics(any());
     }
 
     @Test
@@ -104,7 +109,7 @@ class ImageEncryptorImplTest {
 
         assertNotNull(data);
         verify(fractalGenerator, atLeastOnce()).generate(eq(100), eq(80), anyDouble(), anyDouble(), anyDouble(), anyInt());
-        verify(mandelbrotService, atLeastOnce()).isFractalValid(any());
+        verify(fractalValidator, atLeastOnce()).isValid(any());
         verify(segmentShuffler).segmentAndShuffle(any(), any());
         verify(imageUtils).imageToBytes(any());
     }
@@ -134,7 +139,7 @@ class ImageEncryptorImplTest {
 
         verify(fractalGenerator, atLeastOnce()).generate(
                 eq(50), eq(40), anyDouble(), anyDouble(), anyDouble(), anyInt());
-        verify(mandelbrotService, atLeastOnce()).isFractalValid(any());
+        verify(fractalValidator, atLeastOnce()).isValid(any());
         verify(segmentShuffler).segmentAndShuffle(any(), any());
         verify(imageUtils).imageToBytes(any());
     }
@@ -156,7 +161,7 @@ class ImageEncryptorImplTest {
         assertNotNull(data);
         verify(fractalGenerator, atLeastOnce()).generate(
                 eq(30), eq(30), anyDouble(), anyDouble(), anyDouble(), anyInt());
-        verify(mandelbrotService, atLeastOnce()).isFractalValid(any());
+        verify(fractalValidator, atLeastOnce()).isValid(any());
     }
 
     @Test

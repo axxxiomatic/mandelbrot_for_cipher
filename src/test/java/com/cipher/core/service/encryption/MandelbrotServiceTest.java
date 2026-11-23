@@ -2,6 +2,7 @@ package com.cipher.core.service.encryption;
 
 import com.cipher.core.dto.MandelbrotParams;
 import com.cipher.core.generator.impl.CPUFractalGenerator;
+import com.cipher.core.generator.impl.CPUFractalValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import java.awt.*;
@@ -15,7 +16,7 @@ class MandelbrotServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new MandelbrotService(new CPUFractalGenerator());
+        service = new MandelbrotService(new CPUFractalGenerator(), new CPUFractalValidator());
     }
 
     @Test
@@ -39,35 +40,6 @@ class MandelbrotServiceTest {
         assertNotNull(img);
         assertEquals(100, img.getWidth());
         assertEquals(80, img.getHeight());
-    }
-
-    @Test
-    void paintComponent_withValidImage_shouldDrawImage() {
-        service.generateImage(100, 100, 10000, -0.5, 0.0, 250);
-        BufferedImage targetImage = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g2d = targetImage.createGraphics();
-        assertDoesNotThrow(() -> service.paintComponent(g2d));
-        g2d.dispose();
-        // Проверяем, что что-то нарисовалось
-        boolean hasContent = false;
-        for (int y = 0; y < 100; y++) {
-            for (int x = 0; x < 100; x++) {
-                if (targetImage.getRGB(x, y) != 0) {
-                    hasContent = true;
-                    break;
-                }
-            }
-        }
-        assertTrue(hasContent);
-    }
-
-    @Test
-    void paintComponent_withNullImage_shouldNotThrow() {
-        BufferedImage targetImage = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g2d = targetImage.createGraphics();
-        // service.image = null (по умолчанию null)
-        assertDoesNotThrow(() -> service.paintComponent(g2d));
-        g2d.dispose();
     }
 
     @Test
@@ -160,51 +132,6 @@ class MandelbrotServiceTest {
         assertDoesNotThrow(() -> {
             service.generateImage(100, 100, 10000, -0.5, 0.0, 250);
         });
-    }
-
-    @Test
-    void setTargetWidth_shouldSetValue() {
-        int expectedWidth = 800;
-        service.setTargetWidth(expectedWidth);
-        assertEquals(expectedWidth, service.getTargetWidth());
-    }
-
-    @Test
-    void setTargetHeight_shouldSetValue() {
-        int expectedHeight = 600;
-        service.setTargetHeight(expectedHeight);
-        assertEquals(expectedHeight, service.getTargetHeight());
-    }
-
-    @Test
-    void targetWidth_defaultValue_shouldBeZero() {
-        assertEquals(0, service.getTargetWidth());
-    }
-
-    @Test
-    void targetHeight_defaultValue_shouldBeZero() {
-        assertEquals(0, service.getTargetHeight());
-    }
-
-    @Test
-    void setTargetWidth_withNegativeValue_shouldSet() {
-        service.setTargetWidth(-100);
-        assertEquals(-100, service.getTargetWidth());
-    }
-
-    @Test
-    void setTargetHeight_withNegativeValue_shouldSet() {
-        service.setTargetHeight(-200);
-        assertEquals(-200, service.getTargetHeight());
-    }
-
-    @Test
-    void setTargetWidth_and_setTargetHeight_shouldWorkIndependently() {
-        service.setTargetWidth(1024);
-        service.setTargetHeight(768);
-
-        assertEquals(1024, service.getTargetWidth());
-        assertEquals(768, service.getTargetHeight());
     }
 
     @Test

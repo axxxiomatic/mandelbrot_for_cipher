@@ -143,6 +143,8 @@ public final class CudaBenchmark {
             }
         }
 
+        shutdown(gpu);
+
         String cpuLine = "CPU " + width + "x" + height + " " + Stats.of(cpuSamples) + " " + cpuMetrics;
         System.out.println("  " + cpuLine);
         rows.add(cpuLine);
@@ -215,6 +217,7 @@ public final class CudaBenchmark {
                         width, height, zoom, maxIter, cpuMedian, gpuMedian, speedup, parity));
             }
         }
+        shutdown(gpu);
         return parityOk;
     }
 
@@ -235,18 +238,22 @@ public final class CudaBenchmark {
         XOROperation cpuXor = new CPUXOROperation();
         BufferedImage cpuResult = cpuXor.xor(a, b);
 
+        GPUXOROperation gpuXor = new GPUXOROperation();
         BufferedImage gpuResult;
         try {
-            gpuResult = new GPUXOROperation().xor(a, b);
+            gpuResult = gpuXor.xor(a, b);
         } catch (Throwable t) {
             System.out.printf(Locale.ROOT, "  XOR: GPU-путь упал (%s: %s) — несовместим с TYPE_INT_RGB%n",
                     t.getClass().getSimpleName(), t.getMessage());
+            gpuXor.shutdown();
             return false;
         }
 
         ImageDiff.Diff diff = ImageDiff.compare(cpuResult, gpuResult);
         double cpuMs = median(() -> cpuXor.xor(a, b), o.runs, o.warmup);
-        double gpuMs = median(() -> new GPUXOROperation().xor(a, b), o.runs, o.warmup);
+        // Один и тот же экземпляр: device-буферы переиспользуются, как и в приложении.
+        double gpuMs = median(() -> gpuXor.xor(a, b), o.runs, o.warmup);
+        gpuXor.shutdown();
 
         double speedup = speedup(cpuMs, gpuMs);
         System.out.printf(Locale.ROOT,
@@ -278,6 +285,13 @@ public final class CudaBenchmark {
             System.out.println("  ! инициализация GPU-генератора не удалась: "
                     + t.getClass().getSimpleName() + ": " + t.getMessage());
             return null;
+        }
+    }
+
+    /** Освобождает device-буферы и контекст CUDA, если бэкенд их держит. */
+    private static void shutdown(FractalGenerator gpu) {
+        if (gpu instanceof GPUFractalGenerator gpuGenerator) {
+            gpuGenerator.shutdown();
         }
     }
 
