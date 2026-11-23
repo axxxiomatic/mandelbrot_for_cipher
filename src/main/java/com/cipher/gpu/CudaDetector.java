@@ -1,51 +1,39 @@
 package com.cipher.gpu;
 
-import jcuda.driver.JCudaDriver;
-import jcuda.driver.CUdevice;
-import jcuda.driver.CUcontext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+/**
+ * Совместимый фасад над {@link CudaDevice}.
+ * <p>
+ * Оставлен, потому что на него ссылаются существующие классы и тесты. Вся работа с устройством,
+ * контекстом и проверка свойства {@code -Dcipher.cuda} перенесены в {@link CudaDevice}:
+ * исходная реализация создавала контекст статически (в потоке создания Spring-бина), из-за чего
+ * пул {@code findValidFractalParallel} получал {@code CUDA_ERROR_INVALID_CONTEXT}.
+ * </p>
+ */
+public final class CudaDetector {
 
-import static jcuda.driver.JCudaDriver.*;
-
-public class CudaDetector {
-    private static final Logger log = LoggerFactory.getLogger(CudaDetector.class);
-    private static volatile Boolean cudaAvailable = null;
-    private static volatile boolean contextInitialized = false;
-
-    public static boolean isCudaAvailable() {
-        if (cudaAvailable == null) {
-            synchronized (CudaDetector.class) {
-                if (cudaAvailable == null) {
-                    try {
-                        JCudaDriver.setExceptionsEnabled(true);
-                        cuInit(0);
-                        CUdevice dev = new CUdevice();
-                        cuDeviceGet(dev, 0);
-                        cudaAvailable = true;
-                        log.info("CUDA device detected");
-                    } catch (UnsatisfiedLinkError | NoClassDefFoundError | Exception e) {
-                        cudaAvailable = false;
-                        log.info("CUDA not available: {}", e.toString());
-                    }
-                }
-            }
-        }
-        return cudaAvailable;
+    private CudaDetector() {
     }
 
-    public static synchronized void initializeCudaContext() {
-        if (!isCudaAvailable() || contextInitialized) return;
-        try {
-            CUdevice device = new CUdevice();
-            cuDeviceGet(device, 0);
-            CUcontext context = new CUcontext();
-            cuCtxCreate(context, 0, device);
-            contextInitialized = true;
-            log.info("CUDA context initialized");
-        } catch (Exception e) {
-            log.error("Failed to initialize CUDA context", e);
-            cudaAvailable = false;
-        }
+    /** Доступна ли CUDA: драйвер загружен, устройство найдено, primary context получен. */
+    public static boolean isCudaAvailable() {
+        return CudaDevice.isAvailable();
+    }
+
+    /**
+     * Инициализация контекста — оставлена для обратной совместимости.
+     * Контекст создаётся лениво в {@link CudaDevice#isAvailable()}.
+     */
+    public static void initializeCudaContext() {
+        CudaDevice.isAvailable();
+    }
+
+    /** Имя устройства, например {@code NVIDIA GeForce RTX 3060}. */
+    public static String deviceName() {
+        return CudaDevice.deviceName();
+    }
+
+    /** Архитектура для NVRTC, например {@code sm_86}. */
+    public static String targetArchitecture() {
+        return CudaDevice.targetArchitecture();
     }
 }
