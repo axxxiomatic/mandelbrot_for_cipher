@@ -26,6 +26,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class ImageDecryptorImpl implements ImageDecryptor {
+
+    /** version(4) + salt(16) + attempts(4) + 6 int геометрии. */
+    private static final int HEADER_BYTES = 4 + 16 + 4 + 6 * 4;
     private final MandelbrotService mandelbrotService;
     private final SegmentShuffler segmentShuffler;
     private final ImageUtils imageUtils;
@@ -36,7 +39,7 @@ public class ImageDecryptorImpl implements ImageDecryptor {
      * Дешифрует изображение из бинарного файла, созданного методом encryptWhole.
      * Процесс включает:
      * <ol>
-     *   <li>Чтение соли, количества попыток, координат области и размеров</li>
+     *   <li>Чтение версии алгоритма, соли, количества попыток, координат области и размеров</li>
      *   <li>Восстановление ключей через HKDF с использованием общего секрета</li>
      *   <li>Восстановление параметров фрактала путём прокрутки PRNG</li>
      *   <li>Генерацию фрактала и обратную сегментацию области</li>
@@ -51,7 +54,21 @@ public class ImageDecryptorImpl implements ImageDecryptor {
     @Override
     public BufferedImage decryptImage(File encryptedFile) throws Exception {
         byte[] fileData = Files.readAllBytes(encryptedFile.toPath());
+        if (fileData.length < HEADER_BYTES) {
+            throw new IllegalArgumentException("Файл слишком короткий: " + fileData.length + " байт");
+        }
         ByteBuffer buf = ByteBuffer.wrap(fileData);
+
+        // Версия палитры гаммы. Файл, зашифрованный другой версией, расшифровать нельзя:
+        // XOR с другой гаммой даёт шум, а не «слегка иной» результат.
+        int algorithmVersion = buf.getInt();
+        if (algorithmVersion != ImageEncryptorImpl.ALGORITHM_VERSION) {
+            throw new IllegalStateException(String.format(
+                    "Файл зашифрован версией алгоритма %d, текущая версия %d: "
+                            + "палитра гаммы изменилась, расшифровка невозможна. "
+                            + "Файл нужно перешифровать актуальной версией.",
+                    algorithmVersion, ImageEncryptorImpl.ALGORITHM_VERSION));
+        }
 
         byte[] salt = new byte[16];
         buf.get(salt);
@@ -106,9 +123,16 @@ public class ImageDecryptorImpl implements ImageDecryptor {
                 params.zoom(), params.offsetX(), params.offsetY(), params.maxIter()
         );
 
-        // Обратная сегментация области
+        // Обратная сегментация области. getSubimage возвращает вид того же растра, а реализация
+        // перемешивания ожидает самостоятельное изображение — иначе на GPU-пути растр
+        // приходит в неожиданном типе.
+        BufferedImage areaCopy = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D ag = areaCopy.createGraphics();
+        ag.drawImage(encryptedArea, 0, 0, null);
+        ag.dispose();
+
         BufferedImage unshuffledArea = segmentShuffler.unshuffle(
-                encryptedArea, areaWidth, areaHeight, segPrng
+                areaCopy, areaWidth, areaHeight, segPrng
         );
 
         // XOR области с фракталом

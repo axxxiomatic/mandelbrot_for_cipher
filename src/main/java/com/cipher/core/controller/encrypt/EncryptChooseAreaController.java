@@ -238,7 +238,7 @@ public class EncryptChooseAreaController {
             BufferedImage originalImage = imageUtils.getOriginalImage();
             if (originalImage != null) {
                 EncryptedData data = imageEncryptor.encryptWhole(originalImage);
-                File outFile = fileManager.saveEncryptedImage(data.sessionSalt(), data.attemptCount(),
+                File outFile = fileManager.saveEncryptedImage(data.algorithmVersion(), data.sessionSalt(), data.attemptCount(),
                         data.imageBytes(), data.originalWidth(), data.originalHeight(),
                         data.startX(), data.startY(), data.areaWidth(), data.areaHeight());
                 sceneManager.showEncryptFinalPanel(imageUtils.bytesToImage(data.imageBytes(),
@@ -268,7 +268,7 @@ public class EncryptChooseAreaController {
                 return;
             }
             EncryptedData data = imageEncryptor.encryptPart(imageToEncrypt, selectedRectangle);
-            File outFile = fileManager.saveEncryptedImage(data.sessionSalt(), data.attemptCount(),
+            File outFile = fileManager.saveEncryptedImage(data.algorithmVersion(), data.sessionSalt(), data.attemptCount(),
                     data.imageBytes(), data.originalWidth(), data.originalHeight(),
                     data.startX(), data.startY(), data.areaWidth(), data.areaHeight());
             sceneManager.showEncryptFinalPanel(imageUtils.bytesToImage(data.imageBytes(),

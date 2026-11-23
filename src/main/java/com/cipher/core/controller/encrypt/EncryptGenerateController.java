@@ -65,8 +65,8 @@ public class EncryptGenerateController {
 
             imageEncryptor.prepareSession(sharedSecret);
 
-            mandelbrotService.setTargetWidth(originalImage.getWidth());
-            mandelbrotService.setTargetHeight(originalImage.getHeight());
+            // targetWidth/targetHeight больше не используются: размер приходит в generateImage()
+            
 
             generateUntilGood();
         } catch (Exception e) {
@@ -188,7 +188,7 @@ public class EncryptGenerateController {
                 logger.error("original image is null");
             }
             EncryptedData data = imageEncryptor.encryptWhole(imageToEncrypt);
-            File outFile = fileManager.saveEncryptedImage(data.sessionSalt(), data.attemptCount(),
+            File outFile = fileManager.saveEncryptedImage(data.algorithmVersion(), data.sessionSalt(), data.attemptCount(),
                     data.imageBytes(), data.originalWidth(), data.originalHeight(),
                     data.startX(), data.startY(), data.areaWidth(), data.areaHeight());
             sceneManager.showEncryptFinalPanel(imageUtils.bytesToImage(data.imageBytes(),

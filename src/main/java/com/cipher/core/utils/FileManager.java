@@ -222,14 +222,19 @@ public class FileManager {
     }
 
     /**
-     * Сохраняет зашифрованное изображение с метаданными
+     * Сохраняет зашифрованное изображение с метаданными.
+     * <p>
+     * Формат: {@code version(4) + salt(16) + attempts(4) + 6 int геометрии + данные}.
+     * Версия алгоритма нужна, чтобы отличить файлы старой палитры гаммы: расшифровать их
+     * текущей версией нельзя, и об этом нужно сообщить явно, а не вернуть шум.
+     * </p>
      */
-    public File saveEncryptedImage(byte[] sessionSalt, int attemptCount,
+    public File saveEncryptedImage(int algorithmVersion, byte[] sessionSalt, int attemptCount,
                                     byte[] imageBytes, int originalWidth, int originalHeight,
                                     int startX, int startY, int areaWidth, int areaHeight) throws IOException {
 
-        // Формат: соль(16) + attempts(4) + координаты и размеры(6 int) + данные
-        ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + 16 + 4 + 24 + imageBytes.length);
+        buffer.putInt(algorithmVersion);
         buffer.put(sessionSalt);
         buffer.putInt(attemptCount);
         buffer.putInt(startX);
